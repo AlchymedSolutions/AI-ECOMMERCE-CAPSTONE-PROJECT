@@ -1,0 +1,511 @@
+---
+title: "Capstone Project 2: AI : E-Commerce"
+author: "KIBIDI"
+date: "2026-05-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+
+
+1. Data Collection and Loading
+
+#1.0:Set Working Directory 
+```{r}
+setwd("C:/Users/h6p/Desktop/ALCHYMED DATA ANALYSIS/AI")
+```
+
+
+#1.1:Load Libraries
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(skimr)
+library(corrplot)
+library(caret)
+library(randomForest)
+library(forecast)
+library(janitor)
+
+theme_set(
+  theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 15),
+      plot.subtitle = element_text(size = 12),
+      axis.title = element_text(face = "bold"),
+      legend.title = element_text(face = "bold")
+    )
+)
+```
+
+
+#1.2: Load Dataset
+```{r load-data}
+ecommerce_data <- read.csv("ecommerce_data.csv", stringsAsFactors = FALSE)
+head(ecommerce_data)
+```
+
+
+#1.3a: Explore Data :Structure
+```{r}
+str(ecommerce_data)
+```
+
+
+#1.3b: Explore Data :Statistics
+```{r}
+skimr::skim(ecommerce_data)
+```
+
+
+2. Data Cleaning and Preprocessing
+#2.1:missing values
+```{r}
+ecommerce_clean <- ecommerce_data %>%
+  janitor::clean_names() %>%
+  distinct() %>%
+  mutate(
+    order_date = mdy(order_date),
+    gender = as.factor(gender),
+    location = as.factor(location),
+    product_category = as.factor(product_category),
+    payment_method = as.factor(payment_method),
+    order_status = as.factor(order_status)
+  )
+
+num_cols <- ecommerce_clean %>% select(where(is.numeric)) %>% names()
+cat_cols <- ecommerce_clean %>% select(where(~ is.character(.x) || is.factor(.x))) %>% names()
+
+for (col_name in num_cols) {
+  ecommerce_clean[[col_name]][is.na(ecommerce_clean[[col_name]])] <- median(ecommerce_clean[[col_name]], na.rm = TRUE)
+}
+
+for (col_name in cat_cols) {
+  mode_val <- names(sort(table(ecommerce_clean[[col_name]]), decreasing = TRUE))[1]
+  ecommerce_clean[[col_name]][is.na(ecommerce_clean[[col_name]])] <- mode_val
+}
+
+sum(is.na(ecommerce_clean))
+```
+
+#3. Feature Engineering 
+```{r}
+ecommerce_clean <- ecommerce_clean %>%
+  mutate(
+    order_year = year(order_date),
+    order_month = month(order_date, label = TRUE, abbr = TRUE),
+    order_quarter = quarter(order_date),
+    day_of_week = wday(order_date, label = TRUE, abbr = TRUE),
+    customer_segment = case_when(
+      age < 30 ~ "Young",
+      age < 50 ~ "Adult",
+      TRUE ~ "Senior"
+    ),
+    discount_rate = if_else(product_price > 0, discount / product_price, 0),
+    high_value_order = if_else(purchase_amount >= median(purchase_amount, na.rm = TRUE), "Yes", "No"),
+    net_revenue_est = purchase_amount - shipping_cost,
+    quantity_band = case_when(
+      quantity == 1 ~ "Single",
+      quantity <= 3 ~ "Moderate",
+      TRUE ~ "Bulk"
+    )
+  ) %>%
+  mutate(
+    customer_segment = as.factor(customer_segment),
+    high_value_order = as.factor(high_value_order),
+    quantity_band = as.factor(quantity_band)
+  )
+
+head(ecommerce_clean)
+```
+
+
+#summary statistics 
+```{r}
+summary(ecommerce_clean %>% select(age, product_price, quantity, discount, shipping_cost, purchase_amount, customer_rating, net_revenue_est))
+```
+
+
+## Missing Values and Duplicate Check
+```{r}
+quality_summary <- tibble(
+  metric = c("Rows after cleaning", "Columns", "Remaining missing values", "Duplicate rows after cleaning"),
+  value = c(nrow(ecommerce_clean), ncol(ecommerce_clean), sum(is.na(ecommerce_clean)), sum(duplicated(ecommerce_clean)))
+)
+quality_summary
+```
+
+```{r}
+str(ecommerce_clean)
+```
+
+
+
+3.Exploratory Data Analysis
+
+# 3.1a:Age DistributioN
+```{r}
+ggplot(ecommerce_clean, aes(x = age)) +
+  geom_histogram(fill = "brown", color = "white", bins = 25) +
+  labs(title = "Customer Age Distribution", x = "Age", y = "Count")
+```
+
+# 3.1b:Purchase Amount Distribution
+```{r}
+ggplot(ecommerce_clean, aes(x = purchase_amount)) +
+  geom_histogram(fill = "darkcyan", color = "white", bins = 30) +
+  labs(title = "Distribution of Purchase Amount", x = "Purchase Amount", y = "Frequency")
+```
+
+
+#3.1c:Purchase Amount by Gender boxplot
+```{r}
+ggplot(ecommerce_clean, aes(x = gender, y = purchase_amount, fill = gender)) +
+  geom_boxplot(alpha = 0.8) +
+  labs(title = "Purchase Amount by Gender", x = "Gender", y = "Purchase Amount") +
+  guides(fill = "none")
+```
+
+
+#3.1d:Customer Rating Distribution by Order Status
+```{r}
+ggplot(ecommerce_clean, aes(x = order_status, y = customer_rating, fill = order_status)) +
+  geom_boxplot(alpha = 0.85) +
+  labs(title = "Customer Rating by Order Status", x = "Order Status", y = "Customer Rating") +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+```
+
+#3.1e:Correlation Analysis
+```{r}
+correlation_data <- ecommerce_clean %>%
+  select(age, product_price, quantity, discount, shipping_cost, purchase_amount, customer_rating, order_quarter, discount_rate, net_revenue_est)
+
+cor_matrix <- cor(correlation_data, use = "complete.obs")
+
+corrplot(cor_matrix, method = "color", type = "upper", addCoef.col = "black", tl.col = "black", tl.srt = 45)
+```
+
+4:Customer Behavior Analysis
+
+#4.1:Customer Segment Spending
+```{r segment-spending}
+segment_summary <- ecommerce_clean %>%
+  group_by(customer_segment) %>%
+  summarise(
+    avg_purchase = mean(purchase_amount),
+    avg_quantity = mean(quantity),
+    avg_rating = mean(customer_rating),
+    orders = n(),
+    .groups = "drop"
+  )
+
+segment_summary
+
+ggplot(segment_summary, aes(x = customer_segment, y = avg_purchase, fill = customer_segment)) +
+  geom_col(width = 0.7) +
+  labs(title = "Average Purchase Amount by Customer Segment", x = "Customer Segment", y = "Average Purchase Amount") +
+  guides(fill = "none")
+```
+
+
+#4.2:Purchase Frequency Analysis
+```{r purchase-frequency}
+customer_frequency <- ecommerce_clean %>%
+  count(customer_id, name = "purchase_frequency")
+
+freq_summary <- customer_frequency %>%
+  summarise(
+    min_frequency = min(purchase_frequency),
+    avg_frequency = mean(purchase_frequency),
+    max_frequency = max(purchase_frequency)
+  )
+
+freq_summary
+
+ggplot(customer_frequency, aes(x = purchase_frequency)) +
+  geom_histogram(fill = "mediumpurple", color = "white", bins = 20) +
+  labs(title = "Customer Purchase Frequency Distribution", x = "Number of Purchases per Customer", y = "Customer Count")
+```
+
+
+
+#4.3: High-Value Order Share by Customer Segment
+```{r high-value-share}
+high_value_segment <- ecommerce_clean %>%
+  count(customer_segment, high_value_order) %>%
+  group_by(customer_segment) %>%
+  mutate(share = n / sum(n)) %>%
+  ungroup()
+
+ggplot(high_value_segment, aes(x = customer_segment, y = share, fill = high_value_order)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "High-Value Order Composition by Customer Segment", x = "Customer Segment", y = "Share", fill = "High-Value Order")
+```
+
+
+#4.4:Sales Trend Analysis
+```{r sales-trend-monthly}
+monthly_sales <- ecommerce_clean %>%
+  mutate(month_start = floor_date(order_date, unit = "month")) %>%
+  group_by(month_start) %>%
+  summarise(
+    total_sales = sum(purchase_amount),
+    total_orders = n(),
+    avg_sales = mean(purchase_amount),
+    .groups = "drop"
+  )
+
+monthly_sales
+
+ggplot(monthly_sales, aes(x = month_start, y = total_sales)) +
+  geom_line(color = "firebrick", linewidth = 1.2) +
+  geom_point(color = "firebrick", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "navy", linetype = "dashed") +
+  labs(title = "Monthly Sales Trend", x = "Month", y = "Total Sales")
+```
+
+
+
+#4.5: Forecast-Oriented Time Series Plot
+```{r time-series-forecast}
+sales_ts <- ts(monthly_sales$total_sales, frequency = 12)
+auto_model <- forecast::auto.arima(sales_ts)
+future_sales <- forecast::forecast(auto_model, h = 3)
+plot(future_sales, main = "Short-Term Sales Forecast")
+```
+
+
+5. Regional and Category Analysis
+
+#5.1:Top Product Categories by Sales
+```{r category-sales}
+category_sales <- ecommerce_clean %>%
+  group_by(product_category) %>%
+  summarise(total_sales = sum(purchase_amount), total_quantity = sum(quantity), .groups = "drop") %>%
+  arrange(desc(total_sales))
+
+category_sales
+
+ggplot(category_sales, aes(x = reorder(product_category, total_sales), y = total_sales, fill = product_category)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Total Sales by Product Category", x = "Product Category", y = "Total Sales")
+```
+
+
+#5.2:Category Sales by Gender
+```{r faceted-category-gender}
+ggplot(ecommerce_clean, aes(x = product_category, y = purchase_amount, fill = gender)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  facet_wrap(~ gender) +
+  labs(title = "Purchase Amount by Product Category and Gender", x = "Product Category", y = "Purchase Amount") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+
+#5.3:Top Locations by Sales
+```{r location-sales}
+location_sales <- ecommerce_clean %>%
+  group_by(location) %>%
+  summarise(total_sales = sum(purchase_amount), orders = n(), .groups = "drop") %>%
+  arrange(desc(total_sales)) %>%
+  slice_head(n = 15)
+
+ggplot(location_sales, aes(x = reorder(location, total_sales), y = total_sales, fill = total_sales)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Top 15 Locations by Total Sales", x = "Location", y = "Total Sales")
+```
+
+
+
+#5.4:Payment Method Analysis
+```{r payment-analysis}
+payment_summary <- ecommerce_clean %>%
+  group_by(payment_method) %>%
+  summarise(
+    total_sales = sum(purchase_amount),
+    avg_purchase = mean(purchase_amount),
+    orders = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(total_sales))
+
+payment_summary
+
+ggplot(payment_summary, aes(x = reorder(payment_method, total_sales), y = total_sales, fill = payment_method)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Total Sales by Payment Method", x = "Payment Method", y = "Total Sales")
+```
+
+
+
+#5.5:Discount Impact Analysis
+```{r discount-impact-scatter}
+ggplot(ecommerce_clean, aes(x = discount, y = purchase_amount, color = product_category)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Discount vs Purchase Amount", x = "Discount", y = "Purchase Amount", color = "Product Category")
+```
+
+
+
+#5.6:discount-impact-summary
+```{r discount-impact-summary}
+discount_groups <- ecommerce_clean %>%
+  mutate(discount_band = case_when(
+    discount == 0 ~ "No Discount",
+    discount < quantile(discount[discount > 0], 0.5, na.rm = TRUE) ~ "Lower Discount",
+    TRUE ~ "Higher Discount"
+  )) %>%
+  group_by(discount_band) %>%
+  summarise(
+    avg_purchase = mean(purchase_amount),
+    avg_quantity = mean(quantity),
+    orders = n(),
+    .groups = "drop"
+  )
+
+discount_groups
+
+ggplot(discount_groups, aes(x = discount_band, y = avg_purchase, fill = discount_band)) +
+  geom_col(show.legend = FALSE) +
+  labs(title = "Average Purchase Amount by Discount Band", x = "Discount Band", y = "Average Purchase Amount")
+```
+
+
+#5.7:Order Status Analysis
+```{r order-status-analysis}
+status_summary <- ecommerce_clean %>%
+  count(order_status) %>%
+  mutate(share = n / sum(n))
+
+status_summary
+
+ggplot(status_summary, aes(x = order_status, y = n, fill = order_status)) +
+  geom_col(show.legend = FALSE) +
+  labs(title = "Order Status Distribution", x = "Order Status", y = "Count")
+```
+
+6:Predictive Modeling
+
+#6.1:Regression Model for Sales Prediction
+```{r regression-model-data}
+regression_data <- ecommerce_clean %>%
+  select(purchase_amount, age, gender, product_category, product_price, quantity, discount,
+         shipping_cost, customer_rating, payment_method, order_status, order_quarter,
+         customer_segment, discount_rate, net_revenue_est) %>%
+  drop_na()
+
+set.seed(123)
+reg_train_index <- createDataPartition(regression_data$purchase_amount, p = 0.8, list = FALSE)
+reg_train <- regression_data[reg_train_index, ]
+reg_test <- regression_data[-reg_train_index, ]
+```
+
+
+#6.1:Regression-model-fit
+```{r regression-model-fit}
+reg_model <- lm(purchase_amount ~ . - net_revenue_est, data = reg_train)
+reg_pred <- predict(reg_model, newdata = reg_test)
+
+reg_rmse <- RMSE(reg_pred, reg_test$purchase_amount)
+reg_mae <- MAE(reg_pred, reg_test$purchase_amount)
+reg_r2 <- R2(reg_pred, reg_test$purchase_amount)
+
+reg_metrics <- tibble(
+  Metric = c("RMSE", "MAE", "R-squared"),
+  Value = c(reg_rmse, reg_mae, reg_r2)
+)
+reg_metrics
+```
+
+#6.2:Regression-plot
+```{r regression-plot}
+reg_results <- tibble(actual = reg_test$purchase_amount, predicted = reg_pred)
+
+ggplot(reg_results, aes(x = actual, y = predicted)) +
+  geom_point(color = "steelblue", alpha = 0.65) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Regression Model: Actual vs Predicted Purchase Amount", x = "Actual", y = "Predicted")
+```
+
+
+#6.3:Classification Model for Customer Behavior / Order Outcome
+```{r classification-model-data}
+classification_data <- ecommerce_clean %>%
+  select(order_status, age, gender, product_category, product_price, quantity, discount,
+         shipping_cost, purchase_amount, customer_rating, payment_method, order_quarter,
+         customer_segment, high_value_order, quantity_band) %>%
+  drop_na()
+
+set.seed(123)
+class_train_index <- createDataPartition(classification_data$order_status, p = 0.8, list = FALSE)
+class_train <- classification_data[class_train_index, ]
+class_test <- classification_data[-class_train_index, ]
+```
+
+
+#6.3:classification-model-fit
+```{r classification-model-fit}
+class_model <- randomForest(order_status ~ ., data = class_train, ntree = 200, importance = TRUE)
+class_pred <- predict(class_model, newdata = class_test)
+conf_mat <- confusionMatrix(class_pred, class_test$order_status)
+
+accuracy_val <- as.numeric(conf_mat$overall["Accuracy"])
+precision_vals <- diag(conf_mat$table) / colSums(conf_mat$table)
+recall_vals <- diag(conf_mat$table) / rowSums(conf_mat$table)
+f1_vals <- 2 * (precision_vals * recall_vals) / (precision_vals + recall_vals)
+
+class_metrics <- tibble(
+  Metric = c("Accuracy", "Precision", "Recall", "F1-score"),
+  Value = c(
+    accuracy_val,
+    mean(precision_vals, na.rm = TRUE),
+    mean(recall_vals, na.rm = TRUE),
+    mean(f1_vals, na.rm = TRUE)
+  )
+)
+class_metrics
+```
+
+
+#6.3:Classification-matrix-plot
+```{r classification-matrix-plot}
+conf_df <- as.data.frame(conf_mat$table)
+
+ggplot(conf_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 4) +
+  scale_fill_gradient(low = "#dceaf7", high = "#08519c") +
+  labs(title = "Confusion Matrix Heatmap", x = "Actual Class", y = "Predicted Class", fill = "Count")
+```
+
+#6.4:Variable-importance
+```{r variable-importance}
+varImpPlot(class_model, main = "Random Forest Variable Importance")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+

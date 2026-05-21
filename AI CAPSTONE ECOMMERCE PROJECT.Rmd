@@ -1,0 +1,591 @@
+---
+title: "E-Commerce Data Analysis — Capstone Project"
+author: "KIBIDI"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  message    = FALSE,
+  warning    = FALSE,
+  fig.width  = 9,
+  fig.height = 5.5,
+  fig.align  = "center"
+)
+```
+
+---
+
+# 1. Introduction
+
+This project applies data science techniques to an e-commerce dataset of **1,000 customer transactions**. The analysis covers customer demographics, purchasing behavior, product performance, payment trends, and predictive modelling for sales and order outcomes.
+
+---
+
+
+```{r}
+setwd("C:/Users/h6p/Desktop/AI FOR DATA ANALYSIS")
+```
+
+
+# 2. Load Libraries & Data
+
+```{r libraries}
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(patchwork)
+library(corrplot)
+library(randomForest)
+library(caret)
+library(knitr)
+library(kableExtra)
+
+```
+
+
+ #Load data
+```{r}
+ecommerce <- read_csv("ecommerce_data.csv", show_col_types = FALSE)
+
+glimpse(ecommerce)
+```
+```{r}
+head(ecommerce)
+```
+
+```{r}
+
+ecommerce |>
+  summarise(across(everything(), ~sum(is.na(.)))) |>
+  tidyr::pivot_longer(everything(), names_to = "column", values_to = "missing") |>
+  mutate(
+    total = nrow(ecommerce),
+    pct_missing = round(missing / total * 100, 1)
+  ) |>
+  filter(missing > 0) |>
+  arrange(desc(missing))
+```
+
+# 3. Data Cleaning & Preprocessing
+```{r cleaning}
+ecommerce <- ecommerce %>%
+  mutate(
+    Order_Date       = ymd(Order_Date),
+    Order_Month      = month(Order_Date, label = TRUE),
+    Order_Quarter    = quarter(Order_Date),
+    Order_Year       = year(Order_Date),
+    Age_Group        = cut(Age,
+                           breaks = c(17, 25, 35, 45, 55, 70),
+                           labels = c("18–25", "26–35", "36–45", "46–55", "56–70")),
+    Discount_Applied = Discount > 0,
+    Revenue          = Purchase_Amount,
+    across(where(is.character), as.factor)
+  )
+
+```
+
+
+
+
+```{r}
+# Missing values summary
+ecommerce %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Missing") %>%
+  filter(Missing > 0) %>%
+  kable(caption = "Missing Values per Column") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+
+
+> **No missing values detected.** The dataset is clean and ready for analysis.
+
+---
+
+# 4. Exploratory Data Analysis (EDA)
+
+## 4.1 Dataset Overview
+
+```{r overview-table}
+ecommerce %>%
+  summarise(
+    Customers        = n_distinct(Customer_ID),
+    Total_Orders     = n(),
+    Total_Revenue    = dollar(sum(Revenue)),
+    Avg_Order_Value  = dollar(mean(Revenue)),
+    Avg_Rating       = round(mean(Customer_Rating), 2),
+    Date_Range       = paste(min(Order_Date), "→", max(Order_Date))
+  ) %>%
+  pivot_longer(everything(), names_to = "Metric", values_to = "Value") %>%
+  kable(caption = "Key Business Metrics") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
+```
+
+## 4.2 Customer Demographics
+
+```{r demographics, fig.height=5}
+p1 <- ecommerce %>%
+  count(Gender) %>%
+  mutate(pct = n / sum(n)) %>%
+  ggplot(aes(x = "", y = pct, fill = Gender)) +
+  geom_col(width = 1, color = "white", linewidth = 0.8) +
+  coord_polar("y") +
+  geom_text(aes(label = percent(pct, 1)), position = position_stack(vjust = 0.5),
+            size = 5, fontface = "bold", color = "white") +
+  scale_fill_manual(values = c("#4E79A7", "#F28E2B")) +
+  labs(title = "Gender Distribution", fill = NULL) +
+  theme_void(base_size = 13) +
+  theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5, face = "bold"))
+
+p2 <- ecommerce %>%
+  count(Age_Group) %>%
+  ggplot(aes(x = Age_Group, y = n, fill = Age_Group)) +
+  geom_col(show.legend = FALSE, width = 0.7) +
+  geom_text(aes(label = n), vjust = -0.4, size = 4, fontface = "bold") +
+  scale_fill_brewer(palette = "Set2") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(title = "Customers by Age Group", x = "Age Group", y = "Count") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p1 + p2
+```
+
+## 4.3 Purchase Amount Distribution
+
+```{r purchase-dist}
+p3 <- ggplot(ecommerce, aes(x = Purchase_Amount)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 35,
+                 fill = "#4E79A7", color = "white", alpha = 0.85) +
+  geom_density(color = "#E15759", linewidth = 1.1) +
+  geom_vline(xintercept = mean(ecommerce$Purchase_Amount),
+             linetype = "dashed", color = "#F28E2B", linewidth = 1) +
+  annotate("text", x = mean(ecommerce$Purchase_Amount) + 80,
+           y = 0.00115, label = paste0("Mean: ", dollar(mean(ecommerce$Purchase_Amount))),
+           color = "#F28E2B", size = 4, fontface = "bold") +
+  labs(title = "Distribution of Purchase Amount",
+       x = "Purchase Amount (USD)", y = "Density") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p4 <- ggplot(ecommerce, aes(x = Gender, y = Purchase_Amount, fill = Gender)) +
+  geom_violin(alpha = 0.7, trim = FALSE) +
+  geom_boxplot(width = 0.15, fill = "white", color = "grey40") +
+  scale_fill_manual(values = c("#4E79A7", "#F28E2B")) +
+  scale_y_continuous(labels = dollar) +
+  labs(title = "Purchase Amount by Gender",
+       x = NULL, y = "Purchase Amount (USD)") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none", plot.title = element_text(face = "bold"))
+
+p3 + p4
+```
+
+---
+
+# 5. Product Category Analysis
+
+```{r category-analysis, fig.height=6}
+cat_summary <- ecommerce %>%
+  group_by(Product_Category) %>%
+  summarise(
+    Orders    = n(),
+    Revenue   = sum(Purchase_Amount),
+    Avg_Price = mean(Product_Price),
+    Avg_Rating = mean(Customer_Rating),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Revenue))
+
+p5 <- cat_summary %>%
+  ggplot(aes(x = fct_reorder(Product_Category, Revenue), y = Revenue, fill = Product_Category)) +
+  geom_col(show.legend = FALSE, width = 0.7) +
+  geom_text(aes(label = dollar(Revenue, scale = 1e-3, suffix = "K")),
+            hjust = -0.1, size = 3.8, fontface = "bold") +
+  coord_flip() +
+  scale_y_continuous(labels = dollar, expand = expansion(mult = c(0, 0.18))) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Total Revenue by Product Category",
+       x = NULL, y = "Revenue (USD)") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p6 <- cat_summary %>%
+  ggplot(aes(x = fct_reorder(Product_Category, Avg_Rating), y = Avg_Rating, fill = Product_Category)) +
+  geom_col(show.legend = FALSE, width = 0.7) +
+  geom_text(aes(label = round(Avg_Rating, 2)), hjust = -0.15, size = 3.8, fontface = "bold") +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 4), expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Avg Customer Rating by Category",
+       x = NULL, y = "Average Rating (1–5)") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p5 + p6
+```
+
+---
+
+# 6. Sales Trend Analysis
+
+## 6.1 Monthly Revenue Trend
+
+```{r monthly-trend, fig.height=5}
+monthly <- ecommerce %>%
+  group_by(Order_Month) %>%
+  summarise(Revenue = sum(Purchase_Amount), Orders = n(), .groups = "drop")
+
+ggplot(monthly, aes(x = Order_Month, y = Revenue, group = 1)) +
+  geom_area(fill = "#4E79A7", alpha = 0.25) +
+  geom_line(color = "#4E79A7", linewidth = 1.3) +
+  geom_point(aes(size = Orders), color = "#E15759", show.legend = TRUE) +
+  scale_y_continuous(labels = dollar) +
+  scale_size_continuous(range = c(3, 8), name = "# Orders") +
+  labs(title = "Monthly Revenue & Order Volume",
+       x = "Month", y = "Total Revenue (USD)") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "right")
+```
+
+## 6.2 Revenue by Category Over Time
+
+```{r heatmap, fig.height=5}
+ecommerce %>%
+  group_by(Order_Month, Product_Category) %>%
+  summarise(Revenue = sum(Purchase_Amount), .groups = "drop") %>%
+  ggplot(aes(x = Order_Month, y = Product_Category, fill = Revenue)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  scale_fill_gradient(low = "#EFF3FF", high = "#084594", labels = dollar) +
+  labs(title = "Revenue Heatmap: Category × Month",
+       x = "Month", y = NULL, fill = "Revenue") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+---
+
+# 7. Payment & Order Status Analysis
+
+```{r payment-status, fig.height=5}
+p7 <- ecommerce %>%
+  count(Payment_Method) %>%
+  ggplot(aes(x = fct_reorder(Payment_Method, n), y = n, fill = Payment_Method)) +
+  geom_col(show.legend = FALSE, width = 0.65) +
+  geom_text(aes(label = n), hjust = -0.2, size = 4, fontface = "bold") +
+  coord_flip() +
+  scale_fill_brewer(palette = "Paired") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(title = "Orders by Payment Method", x = NULL, y = "Count") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p8 <- ecommerce %>%
+  count(Order_Status) %>%
+  mutate(pct = n / sum(n)) %>%
+  ggplot(aes(x = fct_reorder(Order_Status, pct), y = pct, fill = Order_Status)) +
+  geom_col(show.legend = FALSE, width = 0.65) +
+  geom_text(aes(label = percent(pct, 1)), hjust = -0.2, size = 4, fontface = "bold") +
+  coord_flip() +
+  scale_fill_manual(values = c("#59A14F", "#E15759", "#F28E2B", "#76B7B2")) +
+  scale_y_continuous(labels = percent, expand = expansion(mult = c(0, 0.15))) +
+  labs(title = "Order Status Breakdown", x = NULL, y = "Proportion") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p7 + p8
+```
+
+---
+
+# 8. Discount & Pricing Impact
+
+```{r discount-impact, fig.height=5}
+p9 <- ecommerce %>%
+  mutate(Discount_Band = cut(Discount, breaks = c(-1, 0, 10, 20, 30, 50),
+                              labels = c("None", "1–10%", "11–20%", "21–30%", "31–50%"))) %>%
+  group_by(Discount_Band) %>%
+  summarise(Avg_Revenue = mean(Purchase_Amount), .groups = "drop") %>%
+  ggplot(aes(x = Discount_Band, y = Avg_Revenue, fill = Discount_Band)) +
+  geom_col(show.legend = FALSE, width = 0.65) +
+  geom_text(aes(label = dollar(Avg_Revenue)), vjust = -0.4, size = 4, fontface = "bold") +
+  scale_fill_brewer(palette = "Blues", direction = 1) +
+  scale_y_continuous(labels = dollar, expand = expansion(mult = c(0, 0.12))) +
+  labs(title = "Avg Revenue by Discount Band",
+       x = "Discount Range", y = "Avg Purchase Amount") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p10 <- ggplot(ecommerce, aes(x = Product_Price, y = Purchase_Amount, color = Product_Category)) +
+  geom_point(alpha = 0.4, size = 1.8) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.9, color = "black") +
+  scale_x_continuous(labels = dollar) +
+  scale_y_continuous(labels = dollar) +
+  scale_color_brewer(palette = "Set1") +
+  labs(title = "Product Price vs Purchase Amount",
+       x = "Product Price", y = "Purchase Amount", color = "Category") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "right")
+
+p9 + p10
+```
+
+---
+
+# 9. Customer Spending & Segmentation
+
+```{r segmentation, fig.height=5}
+customer_seg <- ecommerce %>%
+  group_by(Customer_ID) %>%
+  summarise(
+    Total_Spend   = sum(Purchase_Amount),
+    Num_Orders    = n(),
+    Avg_Rating    = mean(Customer_Rating),
+    .groups = "drop"
+  ) %>%
+  mutate(Segment = case_when(
+    Total_Spend >= quantile(Total_Spend, 0.75) ~ "High Value",
+    Total_Spend >= quantile(Total_Spend, 0.25) ~ "Mid Value",
+    TRUE                                        ~ "Low Value"
+  ))
+
+p11 <- customer_seg %>%
+  count(Segment) %>%
+  ggplot(aes(x = Segment, y = n, fill = Segment)) +
+  geom_col(width = 0.65, show.legend = FALSE) +
+  geom_text(aes(label = n), vjust = -0.4, size = 4.5, fontface = "bold") +
+  scale_fill_manual(values = c("High Value" = "#59A14F", "Mid Value" = "#F28E2B", "Low Value" = "#E15759")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(title = "Customer Segments by Spend", x = NULL, y = "Count") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p12 <- ggplot(customer_seg, aes(x = Num_Orders, y = Total_Spend, color = Segment)) +
+  geom_point(alpha = 0.6, size = 2.5) +
+  scale_y_continuous(labels = dollar) +
+  scale_color_manual(values = c("High Value" = "#59A14F", "Mid Value" = "#F28E2B", "Low Value" = "#E15759")) +
+  labs(title = "Orders vs Total Spend (by Segment)",
+       x = "Number of Orders", y = "Total Spend", color = "Segment") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p11 + p12
+```
+
+---
+
+# 10. Correlation Analysis
+
+```{r correlation, fig.height=5.5}
+numeric_vars <- ecommerce %>%
+  select(Age, Product_Price, Quantity, Discount, Shipping_Cost, Purchase_Amount, Customer_Rating)
+
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+
+corrplot(cor_matrix,
+         method     = "color",
+         type       = "upper",
+         order      = "hclust",
+         tl.col     = "black",
+         tl.srt     = 45,
+         addCoef.col = "black",
+         number.cex = 0.75,
+         col        = colorRampPalette(c("#E15759", "white", "#4E79A7"))(200),
+         title      = "Correlation Matrix — Numeric Variables",
+         mar        = c(0, 0, 2, 0))
+```
+
+---
+
+# 11. Machine Learning
+
+## 11.1 Feature Engineering
+
+```{r feature-engineering}
+ecommerce_ml <- ecommerce %>%
+  mutate(
+    High_Value    = ifelse(Purchase_Amount > median(Purchase_Amount), 1, 0),
+    Completed     = ifelse(Order_Status == "Completed", 1, 0),
+    Gender_Num    = ifelse(Gender == "Male", 1, 0),
+    Disc_Applied  = ifelse(Discount > 0, 1, 0)
+  ) %>%
+  select(Age, Product_Price, Quantity, Discount, Shipping_Cost,
+         Customer_Rating, Gender_Num, Disc_Applied,
+         High_Value, Completed, Purchase_Amount) %>%
+  na.omit()
+```
+
+## 11.2 Model 1 — Purchase Amount Prediction (Regression)
+
+```{r regression}
+set.seed(42)
+idx <- createDataPartition(ecommerce_ml$Purchase_Amount, p = 0.8, list = FALSE)
+train_r <- ecommerce_ml[idx, ]
+test_r  <- ecommerce_ml[-idx, ]
+
+rf_reg <- randomForest(Purchase_Amount ~ Age + Product_Price + Quantity +
+                         Discount + Shipping_Cost + Customer_Rating +
+                         Gender_Num + Disc_Applied,
+                       data  = train_r,
+                       ntree = 300,
+                       importance = TRUE)
+
+pred_r <- predict(rf_reg, test_r)
+
+reg_metrics <- data.frame(
+  Metric = c("MAE", "RMSE", "R²"),
+  Value  = c(
+    round(mean(abs(pred_r - test_r$Purchase_Amount)), 2),
+    round(sqrt(mean((pred_r - test_r$Purchase_Amount)^2)), 2),
+    round(1 - sum((pred_r - test_r$Purchase_Amount)^2) /
+            sum((test_r$Purchase_Amount - mean(test_r$Purchase_Amount))^2), 4)
+  )
+)
+
+kable(reg_metrics, caption = "Regression Model Performance") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r reg-plots, fig.height=5}
+reg_df <- data.frame(Actual = test_r$Purchase_Amount, Predicted = pred_r)
+
+p_reg1 <- ggplot(reg_df, aes(x = Actual, y = Predicted)) +
+  geom_point(alpha = 0.5, color = "#4E79A7", size = 2) +
+  geom_abline(color = "#E15759", linewidth = 1.1, linetype = "dashed") +
+  scale_x_continuous(labels = dollar) +
+  scale_y_continuous(labels = dollar) +
+  labs(title = "Actual vs Predicted — Purchase Amount",
+       x = "Actual", y = "Predicted") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+imp_df <- as.data.frame(importance(rf_reg)) %>%
+  rownames_to_column("Feature") %>%
+  arrange(desc(`%IncMSE`))
+
+p_reg2 <- ggplot(imp_df, aes(x = fct_reorder(Feature, `%IncMSE`), y = `%IncMSE`, fill = `%IncMSE`)) +
+  geom_col(show.legend = FALSE, width = 0.65) +
+  coord_flip() +
+  scale_fill_gradient(low = "#AEC6E8", high = "#4E79A7") +
+  labs(title = "Feature Importance (Regression)",
+       x = NULL, y = "% Increase in MSE") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+p_reg1 + p_reg2
+```
+
+## 11.3 Model 2 — High-Value Purchase Classification
+
+```{r classification}
+set.seed(42)
+ecommerce_ml$High_Value <- as.factor(ecommerce_ml$High_Value)
+
+idx2   <- createDataPartition(ecommerce_ml$High_Value, p = 0.8, list = FALSE)
+train_c <- ecommerce_ml[idx2, ]
+test_c  <- ecommerce_ml[-idx2, ]
+
+rf_clf <- randomForest(High_Value ~ Age + Product_Price + Quantity +
+                         Discount + Shipping_Cost + Customer_Rating +
+                         Gender_Num + Disc_Applied,
+                       data  = train_c,
+                       ntree = 300)
+
+pred_c <- predict(rf_clf, test_c)
+cm     <- confusionMatrix(pred_c, test_c$High_Value)
+
+clf_metrics <- data.frame(
+  Metric    = c("Accuracy", "Precision", "Recall", "F1-Score"),
+  Value     = round(c(
+    cm$overall["Accuracy"],
+    cm$byClass["Precision"],
+    cm$byClass["Recall"],
+    cm$byClass["F1"]
+  ), 4)
+)
+
+kable(clf_metrics, caption = "Classification Model Performance") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r conf-matrix-plot, fig.height=5}
+cm_df <- as.data.frame(cm$table) %>%
+  rename(Predicted = Prediction, Actual = Reference)
+
+ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile(color = "white", linewidth = 1) +
+  geom_text(aes(label = Freq), size = 7, fontface = "bold", color = "white") +
+  scale_fill_gradient(low = "#AEC6E8", high = "#084594") +
+  scale_x_discrete(labels = c("0" = "Low Value", "1" = "High Value")) +
+  scale_y_discrete(labels = c("0" = "Low Value", "1" = "High Value")) +
+  labs(title = "Confusion Matrix — High-Value Classifier",
+       fill = "Count") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+---
+
+# 12. Key Insights & Recommendations
+
+```{r insights-table, echo=FALSE}
+insights <- data.frame(
+  `#`          = 1:7,
+  Insight      = c(
+    "Electronics and Home generate the highest total revenue.",
+    "Customer ratings are evenly spread (avg ≈ 3.0) — no strong satisfaction skew.",
+    "M-Pesa and Credit Card dominate payments, reflecting local & global preferences.",
+    "Higher discount bands do not consistently boost average purchase amount.",
+    "Product price is the strongest predictor of purchase amount in ML models.",
+    "~25% of orders are returned or canceled — a key area for operational improvement.",
+    "Mid-age customers (36–55) form the largest buying group."
+  ),
+  Recommendation = c(
+    "Prioritise stock and promotions for Electronics and Home categories.",
+    "Introduce loyalty programs to push ratings above 4 consistently.",
+    "Optimize checkout for M-Pesa and Credit Card; remove friction elsewhere.",
+    "Re-evaluate discount strategy — focus on targeted rather than blanket discounts.",
+    "Use price-tier promotions to shift customers to higher-value purchases.",
+    "Audit fulfillment processes to reduce returns and cancellations.",
+    "Target 36–55 age bracket with personalized campaigns."
+  )
+)
+
+kable(insights, col.names = c("#", "Insight", "Recommendation"),
+      caption = "Key Business Insights & Recommendations") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+  column_spec(2, italic = TRUE) %>%
+  column_spec(3, bold = TRUE)
+```
+
+---
+
+# 13. Conclusion
+
+This capstone project demonstrated a complete data science pipeline applied to e-commerce data:
+
+- **Data Cleaning** — the dataset was clean with no missing values; date and categorical variables were processed appropriately.
+- **EDA** — revealed key trends in customer demographics, product performance, payment behavior, and seasonal sales.
+- **Machine Learning** — Random Forest models achieved strong performance for both revenue regression and high-value purchase classification.
+- **Business Value** — actionable insights were generated around discounting, category strategy, payment optimization, and customer retention.
+
+The project confirms that data-driven decision-making can meaningfully improve e-commerce operations, customer experience, and revenue growth.
+
+---
+
+*Report generated with R `r R.version$major`.`r R.version$minor` | `r Sys.Date()`*

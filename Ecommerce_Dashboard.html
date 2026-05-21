@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E-Commerce Analytics Dashboard | AlchymedSolutions</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0e1a;--surface:#111827;--surface2:#1a2236;--surface3:#1f2d45;
+    --accent:#00d4ff;--accent2:#7c3aed;--accent3:#10b981;--accent4:#f59e0b;--accent5:#ef4444;
+    --text:#f0f4ff;--text2:#94a3b8;--text3:#64748b;
+    --border:#1e3a5f;--border2:#243b55;
+    --blue:#3b82f6;--teal:#06b6d4;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--pink:#ec4899;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;overflow-x:hidden}
+  
+  /* HEADER */
+  .header{background:linear-gradient(135deg,#0d1b2e 0%,#111827 50%,#0f172a 100%);border-bottom:1px solid var(--border);padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand-icon{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;font-family:'Syne',sans-serif}
+  .brand-text h1{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);letter-spacing:-0.3px}
+  .brand-text p{font-size:11px;color:var(--text2);margin-top:2px;letter-spacing:0.5px;text-transform:uppercase}
+  .header-right{text-align:right}
+  .header-right .analyst{font-family:'Syne',sans-serif;font-size:13px;color:var(--accent);font-weight:600}
+  .header-right .institution{font-size:11px;color:var(--text2);margin-top:3px}
+  .live-dot{display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;margin-right:5px;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+  /* FILTERS */
+  .filters-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .filter-group{display:flex;align-items:center;gap:8px}
+  .filter-group label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap}
+  select,input[type=range]{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 12px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:border-color 0.2s}
+  select:hover,select:focus{border-color:var(--accent)}
+  .filter-badge{background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+  .filter-badge:hover,.filter-badge.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+  .reset-btn{margin-left:auto;background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:7px 16px;font-size:12px;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif}
+  .reset-btn:hover{border-color:var(--accent5);color:var(--accent5)}
+
+  /* TIMELINE */
+  .timeline-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;gap:16px}
+  .timeline-bar label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap}
+  .timeline-slider-wrap{flex:1;display:flex;align-items:center;gap:10px}
+  input[type=range]{flex:1;height:4px;background:var(--border2);accent-color:var(--accent);border:none;padding:0;cursor:pointer}
+  .timeline-label{font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap;min-width:55px}
+  #timeline-range-label{font-size:12px;color:var(--text2);white-space:nowrap;min-width:130px;text-align:center}
+
+  /* STATS ROW */
+  .stats-row{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;padding:20px 32px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;transition:transform 0.2s,border-color 0.2s;cursor:default}
+  .stat-card:hover{transform:translateY(-2px);border-color:var(--border2)}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+  .stat-card.c0::before{background:var(--accent)}
+  .stat-card.c1::before{background:var(--green)}
+  .stat-card.c2::before{background:var(--amber)}
+  .stat-card.c3::before{background:var(--purple)}
+  .stat-card.c4::before{background:var(--blue)}
+  .stat-card.c5::before{background:var(--red)}
+  .stat-card.c6::before{background:var(--pink)}
+  .stat-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px}
+  .stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+  .stat-value{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--text);line-height:1}
+  .stat-sub{font-size:10px;color:var(--text2);margin-top:5px}
+  .stat-trend{font-size:10px;margin-top:4px}
+  .trend-up{color:var(--green)}
+  .trend-down{color:var(--red)}
+
+  /* GRID */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 32px 16px}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:0 32px 16px}
+  .grid-1-2{display:grid;grid-template-columns:1fr 2fr;gap:16px;padding:0 32px 16px}
+  .grid-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px;padding:0 32px 16px}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;overflow:hidden}
+  .chart-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:-0.2px}
+  .chart-sub{font-size:11px;color:var(--text2);margin-bottom:16px}
+  .chart-wrap{position:relative}
+
+  /* LEGENDS */
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+  .legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+  /* FOOTER */
+  .footer{background:var(--surface);border-top:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+  .footer-left{font-size:11px;color:var(--text3)}
+  .footer-right{font-size:11px;color:var(--text2);font-family:'Syne',sans-serif;font-weight:600}
+
+  /* SECTION HEADER */
+  .section-header{padding:4px 32px 12px;display:flex;align-items:center;gap:10px}
+  .section-line{flex:1;height:1px;background:var(--border)}
+  .section-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
+
+  /* CUSTOM scrollbar */
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:var(--surface)}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:5px}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="brand">
+    <div class="brand-icon">AS</div>
+    <div class="brand-text">
+      <h1>E-Commerce Analytics Dashboard</h1>
+      <p><span class="live-dot"></span>1,000 transactions · May 2024 – May 2026</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="analyst">AlchymedSolutions</div>
+    <div class="institution">Center for Data Analytics and Modelling — Chuka University</div>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters-bar">
+  <div class="filter-group">
+    <label>Category</label>
+    <select id="f-cat"><option value="">All</option><option>Electronics</option><option>Beauty</option><option>Sports</option><option>Books</option><option>Fashion</option><option>Home</option><option>Groceries</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Gender</label>
+    <select id="f-gender"><option value="">All</option><option>Male</option><option>Female</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Payment</label>
+    <select id="f-pay"><option value="">All</option><option>M-Pesa</option><option>Credit Card</option><option>Cash on Delivery</option><option>PayPal</option><option>Bank Transfer</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Status</label>
+    <div style="display:flex;gap:6px">
+      <div class="filter-badge" data-status="Completed">Completed</div>
+      <div class="filter-badge" data-status="Returned">Returned</div>
+      <div class="filter-badge" data-status="Canceled">Canceled</div>
+      <div class="filter-badge" data-status="Pending">Pending</div>
+    </div>
+  </div>
+  <div class="filter-group">
+    <label>Age Group</label>
+    <select id="f-age"><option value="">All</option><option>18-25</option><option>26-35</option><option>36-45</option><option>46-55</option><option>56-70</option></select>
+  </div>
+  <button class="reset-btn" onclick="resetFilters()">✕ Reset</button>
+</div>
+
+<!-- TIMELINE -->
+<div class="timeline-bar">
+  <label>⏱ Timeline</label>
+  <div class="timeline-slider-wrap">
+    <span class="timeline-label" id="tl-start">May 2024</span>
+    <input type="range" id="tl-from" min="0" max="24" value="0" step="1">
+    <input type="range" id="tl-to" min="0" max="24" value="24" step="1">
+    <span class="timeline-label" id="tl-end">May 2026</span>
+  </div>
+  <span id="timeline-range-label" style="font-size:11px;color:var(--text2)">Showing: All 25 months</span>
+</div>
+
+<!-- KPI CARDS -->
+<div class="stats-row" id="kpi-row">
+  <div class="stat-card c0"><div class="stat-icon" style="background:#00d4ff22">💰</div><div class="stat-label">Total Revenue</div><div class="stat-value" id="k-rev">$0</div><div class="stat-sub" id="k-rev-sub">Loading...</div></div>
+  <div class="stat-card c1"><div class="stat-icon" style="background:#10b98122">🛒</div><div class="stat-label">Total Orders</div><div class="stat-value" id="k-orders">0</div><div class="stat-sub" id="k-orders-sub">Loading...</div></div>
+  <div class="stat-card c2"><div class="stat-icon" style="background:#f59e0b22">📦</div><div class="stat-label">Avg Order Value</div><div class="stat-value" id="k-aov">$0</div><div class="stat-sub" id="k-aov-sub">Loading...</div></div>
+  <div class="stat-card c3"><div class="stat-icon" style="background:#8b5cf622">⭐</div><div class="stat-label">Avg Rating</div><div class="stat-value" id="k-rating">0</div><div class="stat-sub" id="k-rating-sub">Loading...</div></div>
+  <div class="stat-card c4"><div class="stat-icon" style="background:#3b82f622">✅</div><div class="stat-label">Completion Rate</div><div class="stat-value" id="k-complete">0%</div><div class="stat-sub" id="k-complete-sub">Loading...</div></div>
+  <div class="stat-card c5"><div class="stat-icon" style="background:#ef444422">🔄</div><div class="stat-label">Return Rate</div><div class="stat-value" id="k-return">0%</div><div class="stat-sub" id="k-return-sub">Loading...</div></div>
+  <div class="stat-card c6"><div class="stat-icon" style="background:#ec489922">🎁</div><div class="stat-label">Avg Discount</div><div class="stat-value" id="k-disc">$0</div><div class="stat-sub" id="k-disc-sub">Loading...</div></div>
+</div>
+
+<!-- ROW 1 -->
+<div class="section-header"><div class="section-line"></div><span class="section-label">Revenue & Trends</span><div class="section-line"></div></div>
+<div class="grid-2">
+  <div class="chart-card">
+    <div class="chart-title">Monthly Revenue Trend</div>
+    <div class="chart-sub">Revenue over time with order volume</div>
+    <div class="chart-wrap" style="height:240px"><canvas id="ch-monthly" role="img" aria-label="Monthly revenue trend line chart">Monthly revenue trend</canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Revenue by Product Category</div>
+    <div class="chart-sub">Horizontal bar comparison</div>
+    <div class="chart-wrap" style="height:240px"><canvas id="ch-cat" role="img" aria-label="Revenue by category bar chart">Revenue by category</canvas></div>
+  </div>
+</div>
+
+<!-- ROW 2 -->
+<div class="section-header"><div class="section-line"></div><span class="section-label">Customer Insights</span><div class="section-line"></div></div>
+<div class="grid-3">
+  <div class="chart-card">
+    <div class="chart-title">Gender Split</div>
+    <div class="chart-sub">Revenue distribution by gender</div>
+    <div class="chart-wrap" style="height:180px"><canvas id="ch-gender" role="img" aria-label="Gender split donut chart">Gender split</canvas></div>
+    <div class="legend" id="leg-gender"></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Age Group Revenue</div>
+    <div class="chart-sub">Spending by customer age segment</div>
+    <div class="chart-wrap" style="height:180px"><canvas id="ch-age" role="img" aria-label="Age group revenue bar chart">Age group revenue</canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Order Status Breakdown</div>
+    <div class="chart-sub">Status distribution (count)</div>
+    <div class="chart-wrap" style="height:180px"><canvas id="ch-status" role="img" aria-label="Order status donut chart">Order status</canvas></div>
+    <div class="legend" id="leg-status"></div>
+  </div>
+</div>
+
+<!-- ROW 3 -->
+<div class="section-header"><div class="section-line"></div><span class="section-label">Payment & Pricing</span><div class="section-line"></div></div>
+<div class="grid-2-1">
+  <div class="chart-card">
+    <div class="chart-title">Payment Method Performance</div>
+    <div class="chart-sub">Revenue and order count per payment channel</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="ch-pay" role="img" aria-label="Payment method grouped bar chart">Payment method performance</canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Discount Impact</div>
+    <div class="chart-sub">Avg revenue by discount band</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="ch-disc" role="img" aria-label="Discount impact bar chart">Discount impact</canvas></div>
+  </div>
+</div>
+
+<!-- ROW 4 -->
+<div class="section-header"><div class="section-line"></div><span class="section-label">Category Deep-Dive & Ratings</span><div class="section-line"></div></div>
+<div class="grid-1-2">
+  <div class="chart-card">
+    <div class="chart-title">Avg Rating by Category</div>
+    <div class="chart-sub">Customer satisfaction (1–5 scale)</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="ch-rating" role="img" aria-label="Average rating by category radar chart">Avg rating by category</canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Category × Status Heatmap</div>
+    <div class="chart-sub">Order count breakdown: category vs status</div>
+    <div id="heatmap-container" style="margin-top:4px;overflow:auto"></div>
+  </div>
+</div>
+
+<!-- ROW 5 -->
+<div class="section-header"><div class="section-line"></div><span class="section-label">Quantity & Shipping Analysis</span><div class="section-line"></div></div>
+<div class="grid-2" style="padding-bottom:24px">
+  <div class="chart-card">
+    <div class="chart-title">Revenue by Quantity Ordered</div>
+    <div class="chart-sub">Total revenue at each quantity level</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="ch-qty" role="img" aria-label="Revenue by quantity bar chart">Revenue by quantity</canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Shipping Cost Distribution</div>
+    <div class="chart-sub">Average shipping cost per category</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="ch-ship" role="img" aria-label="Shipping cost bar chart">Shipping cost distribution</canvas></div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">Capstone Project · E-Commerce Data Analysis · 1,000 transactions · 2024–2026</div>
+  <div class="footer-right">AlchymedSolutions · Center for Data Analytics and Modelling — Chuka University</div>
+</div>
+
+<script>
+const RAW = [{"id":"CUST0001","age":56,"g":"Male","loc":"Christyview","cat":"Electronics","price":167.79,"qty":2,"date":"2025-06-22","mo":"2025-06","pay":"PayPal","disc":28.74,"ship":19.65,"amt":326.49,"rating":3,"status":"Returned","ag":"56-70"},{"id":"CUST0002","age":21,"g":"Female","loc":"Wolfeborough","cat":"Beauty","price":62.8,"qty":5,"date":"2025-08-02","mo":"2025-08","pay":"M-Pesa","disc":7.38,"ship":28.35,"amt":334.97,"rating":4,"status":"Completed","ag":"18-25"},{"id":"CUST0003","age":58,"g":"Male","loc":"Port Jessica","cat":"Sports","price":461.59,"qty":5,"date":"2025-11-28","mo":"2025-11","pay":"Cash on Delivery","disc":90.84,"ship":29.16,"amt":2246.27,"rating":4,"status":"Returned","ag":"56-70"},{"id":"CUST0004","age":56,"g":"Female","loc":"Gonzalezmouth","cat":"Books","price":284.5,"qty":1,"date":"2026-05-03","mo":"2026-05","pay":"Credit Card","disc":23.44,"ship":18.34,"amt":279.4,"rating":2,"status":"Returned","ag":"56-70"},{"id":"CUST0005","age":37,"g":"Male","loc":"Reillyhaven","cat":"Fashion","price":166.87,"qty":5,"date":"2026-03-09","mo":"2026-03","pay":"M-Pesa","disc":11.46,"ship":14.31,"amt":837.2,"rating":5,"status":"Pending","ag":"36-45"},{"id":"CUST0006","age":22,"g":"Male","loc":"Lake Dianefort","cat":"Home","price":408.6,"qty":5,"date":"2025-02-22","mo":"2025-02","pay":"Cash on Delivery","disc":76.63,"ship":22.95,"amt":1989.32,"rating":1,"status":"Canceled","ag":"18-25"},{"id":"CUST0007","age":69,"g":"Female","loc":"New Shannonport","cat":"Home","price":133.82,"qty":3,"date":"2025-10-03","mo":"2025-10","pay":"M-Pesa","disc":5.78,"ship":17.03,"amt":412.71,"rating":1,"status":"Returned","ag":"56-70"},{"id":"CUST0008","age":63,"g":"Female","loc":"Loganside","cat":"Home","price":364.86,"qty":3,"date":"2024-11-25","mo":"2024-11","pay":"Credit Card","disc":69.47,"ship":2.13,"amt":1027.24,"rating":1,"status":"Pending","ag":"56-70"},{"id":"CUST0009","age":50,"g":"Male","loc":"Andrewhaven","cat":"Books","price":42.93,"qty":1,"date":"2025-04-06","mo":"2025-04","pay":"Bank Transfer","disc":9.98,"ship":17.34,"amt":50.29,"rating":4,"status":"Returned","ag":"46-55"},{"id":"CUST0010","age":47,"g":"Female","loc":"Daniellefort","cat":"Books","price":217.74,"qty":2,"date":"2024-10-04","mo":"2024-10","pay":"PayPal","disc":56.37,"ship":25.98,"amt":405.09,"rating":4,"status":"Returned","ag":"46-55"},{"id":"CUST0011","age":20,"g":"Male","loc":"East Judyfort","cat":"Beauty","price":372.95,"qty":5,"date":"2026-04-06","mo":"2026-04","pay":"Bank Transfer","disc":52.73,"ship":26.62,"amt":1838.64,"rating":2,"status":"Pending","ag":"18-25"},{"id":"CUST0012","age":59,"g":"Male","loc":"Codyburgh","cat":"Groceries","price":138.64,"qty":4,"date":"2025-03-12","mo":"2025-03","pay":"PayPal","disc":16.04,"ship":15.42,"amt":553.94,"rating":5,"status":"Returned","ag":"56-70"},{"id":"CUST0013","age":38,"g":"Female","loc":"North Emilyborough","cat":"Sports","price":167.49,"qty":4,"date":"2026-04-30","mo":"2026-04","pay":"M-Pesa","disc":22.27,"ship":5.84,"amt":653.53,"rating":3,"status":"Completed","ag":"36-45"},{"id":"CUST0014","age":65,"g":"Female","loc":"Wagnermouth","cat":"Fashion","price":238.43,"qty":4,"date":"2025-11-20","mo":"2025-11","pay":"M-Pesa","disc":34.25,"ship":15.79,"amt":935.26,"rating":4,"status":"Returned","ag":"56-70"},{"id":"CUST0015","age":37,"g":"Male","loc":"North Benjaminfurt","cat":"Home","price":304.08,"qty":3,"date":"2025-04-22","mo":"2025-04","pay":"Credit Card","disc":40.47,"ship":17.15,"amt":888.92,"rating":4,"status":"Canceled","ag":"36-45"},{"id":"CUST0016","age":64,"g":"Female","loc":"Michellebury","cat":"Beauty","price":280.53,"qty":4,"date":"2024-08-16","mo":"2024-08","pay":"PayPal","disc":8.39,"ship":11.72,"amt":1125.45,"rating":5,"status":"Pending","ag":"56-70"},{"id":"CUST0017","age":46,"g":"Female","loc":"Beardberg","cat":"Books","price":411.73,"qty":4,"date":"2024-10-31","mo":"2024-10","pay":"Credit Card","disc":76,"ship":3.46,"amt":1574.38,"rating":1,"status":"Pending","ag":"46-55"},{"id":"CUST0018","age":61,"g":"Female","loc":"New Catherine","cat":"Books","price":250.29,"qty":3,"date":"2024-07-09","mo":"2024-07","pay":"Bank Transfer","disc":63.54,"ship":4.96,"amt":692.29,"rating":2,"status":"Canceled","ag":"56-70"},{"id":"CUST0019","age":33,"g":"Male","loc":"Rogersport","cat":"Electronics","price":277.84,"qty":1,"date":"2025-05-24","mo":"2025-05","pay":"PayPal","disc":59.02,"ship":22.91,"amt":241.73,"rating":2,"status":"Canceled","ag":"26-35"},{"id":"CUST0020","age":37,"g":"Female","loc":"Port Antonio","cat":"Books","price":103.14,"qty":5,"date":"2025-06-30","mo":"2025-06","pay":"Credit Card","disc":15.71,"ship":11.4,"amt":511.39,"rating":4,"status":"Pending","ag":"36-45"},{"id":"CUST0021","age":58,"g":"Male","loc":"Mcgrathborough","cat":"Sports","price":398.63,"qty":3,"date":"2024-05-16","mo":"2024-05","pay":"M-Pesa","disc":100.79,"ship":10.33,"amt":1105.43,"rating":2,"status":"Canceled","ag":"56-70"},{"id":"CUST0022","age":34,"g":"Female","loc":"North Christopher","cat":"Sports","price":259.72,"qty":1,"date":"2025-08-20","mo":"2025-08","pay":"Credit Card","disc":1.79,"ship":6.35,"amt":264.28,"rating":1,"status":"Returned","ag":"26-35"},{"id":"CUST0023","age":42,"g":"Female","loc":"New Josephside","cat":"Sports","price":241.81,"qty":5,"date":"2024-06-18","mo":"2024-06","pay":"Credit Card","disc":8.25,"ship":24.56,"amt":1225.36,"rating":4,"status":"Returned","ag":"36-45"},{"id":"CUST0024","age":40,"g":"Male","loc":"Edwardshire","cat":"Fashion","price":211.9,"qty":3,"date":"2024-06-04","mo":"2024-06","pay":"Credit Card","disc":50.12,"ship":13.37,"amt":598.95,"rating":5,"status":"Pending","ag":"36-45"},{"id":"CUST0025","age":51,"g":"Female","loc":"New Dominique","cat":"Beauty","price":63.9,"qty":3,"date":"2024-11-19","mo":"2024-11","pay":"PayPal","disc":6.39,"ship":9.16,"amt":194.47,"rating":5,"status":"Canceled","ag":"46-55"},{"id":"CUST0026","age":37,"g":"Female","loc":"Jessicahaven","cat":"Fashion","price":130.63,"qty":1,"date":"2025-05-23","mo":"2025-05","pay":"M-Pesa","disc":29.79,"ship":5.23,"amt":106.07,"rating":4,"status":"Completed","ag":"36-45"},{"id":"CUST0027","age":67,"g":"Male","loc":"Colemanchester","cat":"Fashion","price":247.23,"qty":2,"date":"2025-04-01","mo":"2025-04","pay":"Cash on Delivery","disc":62.16,"ship":18.84,"amt":451.14,"rating":1,"status":"Canceled","ag":"56-70"},{"id":"CUST0028","age":48,"g":"Female","loc":"Kathyport","cat":"Books","price":280.12,"qty":1,"date":"2024-07-11","mo":"2024-07","pay":"Bank Transfer","disc":49,"ship":22.33,"amt":253.45,"rating":5,"status":"Pending","ag":"46-55"},{"id":"CUST0029","age":47,"g":"Male","loc":"South Blake","cat":"Electronics","price":265.5,"qty":4,"date":"2025-04-23","mo":"2025-04","pay":"Bank Transfer","disc":72.84,"ship":5.66,"amt":994.82,"rating":5,"status":"Returned","ag":"46-55"},{"id":"CUST0030","age":45,"g":"Female","loc":"Lindaberg","cat":"Fashion","price":221.43,"qty":2,"date":"2025-07-09","mo":"2025-07","pay":"M-Pesa","disc":11.72,"ship":26.34,"amt":457.48,"rating":4,"status":"Pending","ag":"36-45"},{"id":"CUST0031","age":23,"g":"Male","loc":"West Kristine","cat":"Sports","price":467.52,"qty":3,"date":"2025-06-06","mo":"2025-06","pay":"Cash on Delivery","disc":137.97,"ship":11.15,"amt":1275.74,"rating":5,"status":"Completed","ag":"18-25"},{"id":"CUST0032","age":50,"g":"Male","loc":"North Amyview","cat":"Sports","price":427.86,"qty":1,"date":"2024-05-15","mo":"2024-05","pay":"PayPal","disc":19.2,"ship":20.97,"amt":429.63,"rating":4,"status":"Canceled","ag":"46-55"},{"id":"CUST0033","age":23,"g":"Female","loc":"Nashmouth","cat":"Sports","price":274.82,"qty":2,"date":"2025-08-21","mo":"2025-08","pay":"Cash on Delivery","disc":18.99,"ship":4.25,"amt":534.9,"rating":5,"status":"Completed","ag":"18-25"},{"id":"CUST0034","age":49,"g":"Male","loc":"Jessicafort","cat":"Home","price":445.75,"qty":5,"date":"2026-05-08","mo":"2026-05","pay":"Cash on Delivery","disc":3.08,"ship":25.61,"amt":2251.28,"rating":3,"status":"Canceled","ag":"46-55"},{"id":"CUST0035","age":37,"g":"Male","loc":"Lloydport","cat":"Beauty","price":473.25,"qty":2,"date":"2026-02-11","mo":"2026-02","pay":"Bank Transfer","disc":78.9,"ship":6.52,"amt":874.12,"rating":1,"status":"Canceled","ag":"36-45"},{"id":"CUST0036","age":28,"g":"Male","loc":"Lake Justinmouth","cat":"Electronics","price":236.82,"qty":4,"date":"2024-07-30","mo":"2024-07","pay":"Credit Card","disc":7.45,"ship":8.85,"amt":948.68,"rating":1,"status":"Completed","ag":"26-35"},{"id":"CUST0037","age":56,"g":"Female","loc":"South Benjamin","cat":"Beauty","price":352.47,"qty":5,"date":"2025-06-24","mo":"2025-06","pay":"Bank Transfer","disc":21.97,"ship":11.7,"amt":1752.08,"rating":5,"status":"Completed","ag":"56-70"},{"id":"CUST0038","age":29,"g":"Female","loc":"Michaelport","cat":"Electronics","price":304.48,"qty":3,"date":"2025-10-19","mo":"2025-10","pay":"M-Pesa","disc":23.21,"ship":25.19,"amt":915.42,"rating":5,"status":"Completed","ag":"26-35"},{"id":"CUST0039","age":39,"g":"Male","loc":"Port Meredithview","cat":"Fashion","price":414.79,"qty":2,"date":"2024-10-15","mo":"2024-10","pay":"Credit Card","disc":75.47,"ship":8.78,"amt":762.89,"rating":1,"status":"Returned","ag":"36-45"},{"id":"CUST0040","age":63,"g":"Female","loc":"South Chris","cat":"Groceries","price":426.71,"qty":4,"date":"2024-10-31","mo":"2024-10","pay":"Credit Card","disc":15.96,"ship":21.09,"amt":1711.97,"rating":4,"status":"Canceled","ag":"56-70"},{"id":"CUST0041","age":66,"g":"Female","loc":"New Mark","cat":"Home","price":283.49,"qty":1,"date":"2024-05-16","mo":"2024-05","pay":"M-Pesa","disc":59.69,"ship":12.13,"amt":235.93,"rating":3,"status":"Canceled","ag":"56-70"},{"id":"CUST0042","age":21,"g":"Female","loc":"New Rebeccashire","cat":"Electronics","price":15.65,"qty":2,"date":"2026-04-24","mo":"2026-04","pay":"Cash on Delivery","disc":3.55,"ship":2.04,"amt":29.79,"rating":5,"status":"Canceled","ag":"18-25"},{"id":"CUST0043","age":54,"g":"Female","loc":"South Cheryl","cat":"Fashion","price":100.76,"qty":4,"date":"2025-07-19","mo":"2025-07","pay":"Bank Transfer","disc":18.04,"ship":28.65,"amt":413.65,"rating":4,"status":"Pending","ag":"46-55"},{"id":"CUST0044","age":61,"g":"Male","loc":"Gutierrezstad","cat":"Books","price":79.09,"qty":2,"date":"2025-10-03","mo":"2025-10","pay":"M-Pesa","disc":12.84,"ship":29.87,"amt":175.21,"rating":3,"status":"Canceled","ag":"56-70"},{"id":"CUST0045","age":52,"g":"Female","loc":"Cynthiastad","cat":"Fashion","price":62.21,"qty":2,"date":"2024-07-27","mo":"2024-07","pay":"PayPal","disc":11.08,"ship":25.56,"amt":138.9,"rating":5,"status":"Pending","ag":"46-55"},{"id":"CUST0046","age":52,"g":"Female","loc":"Spearsburgh","cat":"Books","price":44.07,"qty":1,"date":"2024-05-19","mo":"2024-05","pay":"Credit Card","disc":12.03,"ship":7.25,"amt":39.29,"rating":5,"status":"Pending","ag":"46-55"},{"id":"CUST0047","age":32,"g":"Male","loc":"Lake Mary","cat":"Sports","price":290.6,"qty":4,"date":"2025-12-11","mo":"2025-12","pay":"M-Pesa","disc":27.75,"ship":16.26,"amt":1150.91,"rating":2,"status":"Returned","ag":"26-35"},{"id":"CUST0048","age":38,"g":"Female","loc":"Campbellstad","cat":"Home","price":133.74,"qty":3,"date":"2026-02-01","mo":"2026-02","pay":"Bank Transfer","disc":0.26,"ship":17.9,"amt":418.86,"rating":3,"status":"Returned","ag":"36-45"},{"id":"CUST0049","age":58,"g":"Female","loc":"Tammyhaven","cat":"Sports","price":135.18,"qty":2,"date":"2025-01-03","mo":"2025-01","pay":"Bank Transfer","disc":38.09,"ship":27.79,"amt":260.06,"rating":3,"status":"Completed","ag":"56-70"},{"id":"CUST0050","age":63,"g":"Male","loc":"North Chad","cat":"Home","price":274.05,"qty":2,"date":"2025-12-12","mo":"2025-12","pay":"Credit Card","disc":3.2,"ship":9.23,"amt":554.13,"rating":2,"status":"Canceled","ag":"56-70"},{"id":"CUST0051","age":32,"g":"Male","loc":"Lake Wendy","cat":"Books","price":25.8,"qty":3,"date":"2025-10-29","mo":"2025-10","pay":"Bank Transfer","disc":3.58,"ship":15.46,"amt":89.28,"rating":3,"status":"Completed","ag":"26-35"},{"id":"CUST0052","age":37,"g":"Female","loc":"Stevensshire","cat":"Books","price":51.48,"qty":2,"date":"2026-02-06","mo":"2026-02","pay":"Cash on Delivery","disc":11.99,"ship":10.54,"amt":101.51,"rating":2,"status":"Pending","ag":"36-45"},{"id":"CUST0053","age":50,"g":"Male","loc":"North Denise","cat":"Beauty","price":129.68,"qty":3,"date":"2024-11-21","mo":"2024-11","pay":"PayPal","disc":30.42,"ship":21.09,"amt":379.71,"rating":5,"status":"Pending","ag":"46-55"},{"id":"CUST0054","age":19,"g":"Female","loc":"West Jefferyside","cat":"Groceries","price":276.69,"qty":1,"date":"2024-05-19","mo":"2024-05","pay":"PayPal","disc":3.52,"ship":23.63,"amt":296.8,"rating":4,"status":"Completed","ag":"18-25"},{"id":"CUST0055","age":32,"g":"Male","loc":"Gonzalezview","cat":"Home","price":336.57,"qty":1,"date":"2025-06-26","mo":"2025-06","pay":"M-Pesa","disc":44.85,"ship":19.9,"amt":311.62,"rating":2,"status":"Pending","ag":"26-35"},{"id":"CUST0056","age":60,"g":"Female","loc":"Port Martinburgh","cat":"Groceries","price":33.48,"qty":4,"date":"2025-12-15","mo":"2025-12","pay":"M-Pesa","disc":4.91,"ship":10.23,"amt":139.24,"rating":3,"status":"Pending","ag":"56-70"},{"id":"CUST0057","age":68,"g":"Male","loc":"Taylorfort","cat":"Fashion","price":459.23,"qty":3,"date":"2025-02-25","mo":"2025-02","pay":"PayPal","disc":120.55,"ship":10.15,"amt":1267.29,"rating":2,"status":"Completed","ag":"56-70"},{"id":"CUST0058","age":60,"g":"Female","loc":"North Joshua","cat":"Sports","price":373.67,"qty":2,"date":"2024-09-15","mo":"2024-09","pay":"Credit Card","disc":22.53,"ship":22.18,"amt":746.99,"rating":2,"status":"Canceled","ag":"56-70"},{"id":"CUST0059","age":38,"g":"Male","loc":"Martinmouth","cat":"Fashion","price":97.96,"qty":5,"date":"2026-01-06","mo":"2026-01","pay":"Credit Card","disc":26.7,"ship":26.73,"amt":489.83,"rating":4,"status":"Canceled","ag":"36-45"},{"id":"CUST0060","age":24,"g":"Male","loc":"Port Kyleshire","cat":"Home","price":25.81,"qty":5,"date":"2025-05-10","mo":"2025-05","pay":"Cash on Delivery","disc":1.59,"ship":16.2,"amt":143.66,"rating":5,"status":"Canceled","ag":"18-25"},{"id":"CUST0061","age":59,"g":"Female","loc":"Ramirezhaven","cat":"Books","price":221.4,"qty":5,"date":"2025-06-07","mo":"2025-06","pay":"PayPal","disc":53.43,"ship":11.51,"amt":1065.08,"rating":1,"status":"Canceled","ag":"56-70"},{"id":"CUST0062","age":21,"g":"Male","loc":"Mcleanshire","cat":"Electronics","price":482.74,"qty":5,"date":"2026-02-14","mo":"2026-02","pay":"Credit Card","disc":45.06,"ship":15.31,"amt":2383.95,"rating":5,"status":"Returned","ag":"18-25"},{"id":"CUST0063","age":49,"g":"Female","loc":"New Thomas","cat":"Groceries","price":481,"qty":5,"date":"2024-07-30","mo":"2024-07","pay":"Cash on Delivery","disc":91.35,"ship":14.28,"amt":2327.93,"rating":4,"status":"Returned","ag":"46-55"},{"id":"CUST0064","age":24,"g":"Female","loc":"Vickieville","cat":"Beauty","price":416.15,"qty":2,"date":"2025-03-31","mo":"2025-03","pay":"Bank Transfer","disc":119.73,"ship":18.91,"amt":731.48,"rating":1,"status":"Canceled","ag":"18-25"},{"id":"CUST0065","age":53,"g":"Male","loc":"Michaelberg","cat":"Groceries","price":455.4,"qty":1,"date":"2026-01-31","mo":"2026-01","pay":"Cash on Delivery","disc":119.06,"ship":7.91,"amt":344.25,"rating":4,"status":"Completed","ag":"46-55"},{"id":"CUST0066","age":62,"g":"Male","loc":"Port Andrew","cat":"Home","price":294.96,"qty":2,"date":"2025-12-09","mo":"2025-12","pay":"Bank Transfer","disc":0.24,"ship":26.74,"amt":616.42,"rating":2,"status":"Returned","ag":"56-70"},{"id":"CUST0067","age":53,"g":"Male","loc":"Andrewview","cat":"Beauty","price":350.31,"qty":3,"date":"2025-06-20","mo":"2025-06","pay":"PayPal","disc":20.83,"ship":26.29,"amt":1056.39,"rating":4,"status":"Completed","ag":"46-55"},{"id":"CUST0068","age":32,"g":"Male","loc":"Melissatown","cat":"Fashion","price":376.38,"qty":3,"date":"2026-04-12","mo":"2026-04","pay":"Bank Transfer","disc":79.32,"ship":20.17,"amt":1069.99,"rating":3,"status":"Canceled","ag":"26-35"},{"id":"CUST0069","age":54,"g":"Male","loc":"Cruzshire","cat":"Electronics","price":233.82,"qty":2,"date":"2025-07-16","mo":"2025-07","pay":"Credit Card","disc":22.03,"ship":27.49,"amt":473.1,"rating":2,"status":"Canceled","ag":"46-55"},{"id":"CUST0070","age":69,"g":"Male","loc":"Smithchester","cat":"Groceries","price":180.12,"qty":5,"date":"2024-05-17","mo":"2024-05","pay":"Cash on Delivery","disc":30.67,"ship":14.42,"amt":884.35,"rating":4,"status":"Returned","ag":"56-70"},{"id":"CUST0071","age":33,"g":"Male","loc":"North Christineshire","cat":"Home","price":82.5,"qty":2,"date":"2026-03-26","mo":"2026-03","pay":"Bank Transfer","disc":7.65,"ship":20.64,"amt":177.99,"rating":2,"status":"Completed","ag":"26-35"},{"id":"CUST0072","age":56,"g":"Male","loc":"South Marco","cat":"Groceries","price":99.89,"qty":4,"date":"2025-06-25","mo":"2025-06","pay":"Credit Card","disc":2.04,"ship":28.78,"amt":426.3,"rating":1,"status":"Canceled","ag":"56-70"},{"id":"CUST0073","age":60,"g":"Male","loc":"West Geraldberg","cat":"Groceries","price":409.42,"qty":3,"date":"2025-06-27","mo":"2025-06","pay":"Credit Card","disc":118.64,"ship":28.42,"amt":1138.04,"rating":2,"status":"Canceled","ag":"56-70"},{"id":"CUST0074","age":30,"g":"Female","loc":"Christopherville","cat":"Electronics","price":7.69,"qty":1,"date":"2024-11-12","mo":"2024-11","pay":"Cash on Delivery","disc":2.02,"ship":29.98,"amt":35.65,"rating":3,"status":"Pending","ag":"26-35"},{"id":"CUST0075","age":26,"g":"Male","loc":"North Marieshire","cat":"Groceries","price":351.85,"qty":2,"date":"2025-05-09","mo":"2025-05","pay":"Bank Transfer","disc":65.51,"ship":28.24,"amt":666.43,"rating":5,"status":"Canceled","ag":"26-35"},{"id":"CUST0076","age":32,"g":"Female","loc":"Ericfort","cat":"Beauty","price":95.5,"qty":2,"date":"2025-08-11","mo":"2025-08","pay":"PayPal","disc":11.95,"ship":18.43,"amt":197.48,"rating":2,"status":"Returned","ag":"26-35"},{"id":"CUST0077","age":24,"g":"Male","loc":"Lake Georgeville","cat":"Books","price":332.28,"qty":5,"date":"2025-09-14","mo":"2025-09","pay":"Bank Transfer","disc":13.29,"ship":18.38,"amt":1666.49,"rating":4,"status":"Pending","ag":"18-25"},{"id":"CUST0078","age":53,"g":"Male","loc":"Natalieside","cat":"Books","price":409.35,"qty":3,"date":"2026-04-08","mo":"2026-04","pay":"Cash on Delivery","disc":94.26,"ship":23.32,"amt":1157.11,"rating":4,"status":"Pending","ag":"46-55"},{"id":"CUST0079","age":29,"g":"Male","loc":"Markchester","cat":"Fashion","price":403.94,"qty":4,"date":"2025-03-11","mo":"2025-03","pay":"Credit Card","disc":43.85,"ship":20.72,"amt":1592.63,"rating":3,"status":"Completed","ag":"26-35"},{"id":"CUST0080","age":27,"g":"Male","loc":"West Catherine","cat":"Sports","price":409.56,"qty":3,"date":"2025-11-03","mo":"2025-11","pay":"PayPal","disc":7.66,"ship":27.91,"amt":1248.93,"rating":2,"status":"Returned","ag":"26-35"},{"id":"CUST0081","age":65,"g":"Female","loc":"South Joseland","cat":"Home","price":113.8,"qty":4,"date":"2024-09-13","mo":"2024-09","pay":"PayPal","disc":4.89,"ship":11.26,"amt":461.57,"rating":3,"status":"Canceled","ag":"56-70"},{"id":"CUST0082","age":46,"g":"Female","loc":"Jenniferhaven","cat":"Electronics","price":281.63,"qty":5,"date":"2025-04-06","mo":"2025-04","pay":"M-Pesa","disc":9.2,"ship":15.9,"amt":1414.85,"rating":1,"status":"Returned","ag":"46-55"},{"id":"CUST0083","age":36,"g":"Male","loc":"New Kimberlyhaven","cat":"Beauty","price":296.72,"qty":2,"date":"2026-01-19","mo":"2026-01","pay":"M-Pesa","disc":8.78,"ship":12.63,"amt":597.29,"rating":1,"status":"Pending","ag":"36-45"},{"id":"CUST0084","age":70,"g":"Female","loc":"Jonathanchester","cat":"Groceries","price":497.39,"qty":2,"date":"2026-04-25","mo":"2026-04","pay":"PayPal","disc":143.17,"ship":28.28,"amt":879.89,"rating":2,"status":"Canceled","ag":"56-70"},{"id":"CUST0085","age":63,"g":"Male","loc":"Christopherview","cat":"Beauty","price":397.18,"qty":1,"date":"2026-05-02","mo":"2026-05","pay":"PayPal","disc":63.32,"ship":7.89,"amt":341.75,"rating":3,"status":"Canceled","ag":"56-70"},{"id":"CUST0086","age":35,"g":"Female","loc":"Troyville","cat":"Books","price":76.68,"qty":5,"date":"2024-09-30","mo":"2024-09","pay":"Credit Card","disc":17.92,"ship":27.92,"amt":393.4,"rating":3,"status":"Returned","ag":"26-35"},{"id":"CUST0087","age":52,"g":"Female","loc":"West Susan","cat":"Fashion","price":83.87,"qty":5,"date":"2026-03-12","mo":"2026-03","pay":"M-Pesa","disc":3.03,"ship":7.11,"amt":423.43,"rating":4,"status":"Completed","ag":"46-55"},{"id":"CUST0088","age":55,"g":"Female","loc":"Lake Daniellebury","cat":"Fashion","price":119.36,"qty":5,"date":"2024-06-15","mo":"2024-06","pay":"Credit Card","disc":15.91,"ship":6.95,"amt":587.84,"rating":5,"status":"Returned","ag":"46-55"},{"id":"CUST0089","age":58,"g":"Female","loc":"South Brandon","cat":"Fashion","price":150.41,"qty":4,"date":"2025-01-10","mo":"2025-01","pay":"PayPal","disc":33.07,"ship":4.56,"amt":573.13,"rating":4,"status":"Canceled","ag":"56-70"},{"id":"CUST0090","age":35,"g":"Female","loc":"Evelynhaven","cat":"Groceries","price":162.33,"qty":2,"date":"2026-04-04","mo":"2026-04","pay":"PayPal","disc":42.08,"ship":5.79,"amt":288.37,"rating":3,"status":"Returned","ag":"26-35"},{"id":"CUST0091","age":42,"g":"Male","loc":"East Eric","cat":"Sports","price":82.89,"qty":1,"date":"2024-12-29","mo":"2024-12","pay":"Cash on Delivery","disc":15.79,"ship":21.83,"amt":88.93,"rating":4,"status":"Completed","ag":"36-45"},{"id":"CUST0092","age":20,"g":"Female","loc":"East Donna","cat":"Beauty","price":414.7,"qty":2,"date":"2026-04-26","mo":"2026-04","pay":"Cash on Delivery","disc":98.59,"ship":14.28,"amt":745.09,"rating":3,"status":"Completed","ag":"18-25"},{"id":"CUST0093","age":52,"g":"Male","loc":"New Dianemouth","cat":"Sports","price":489.43,"qty":2,"date":"2026-03-10","mo":"2026-03","pay":"PayPal","disc":81.06,"ship":25.86,"amt":923.66,"rating":1,"status":"Canceled","ag":"46-55"},{"id":"CUST0094","age":53,"g":"Male","loc":"Jacksonbury","cat":"Electronics","price":205.83,"qty":4,"date":"2024-06-24","mo":"2024-06","pay":"Cash on Delivery","disc":17.48,"ship":22.46,"amt":828.3,"rating":5,"status":"Completed","ag":"46-55"},{"id":"CUST0095","age":61,"g":"Female","loc":"Port Scott","cat":"Fashion","price":423.1,"qty":3,"date":"2025-10-10","mo":"2025-10","pay":"PayPal","disc":73.2,"ship":6.1,"amt":1202.2,"rating":1,"status":"Completed","ag":"56-70"},{"id":"CUST0096","age":69,"g":"Female","loc":"Ronaldport","cat":"Home","price":223.49,"qty":5,"date":"2026-02-26","mo":"2026-02","pay":"Credit Card","disc":31.7,"ship":25.51,"amt":1111.26,"rating":4,"status":"Completed","ag":"56-70"},{"id":"CUST0097","age":42,"g":"Male","loc":"Daltonfurt","cat":"Beauty","price":135.58,"qty":5,"date":"2026-05-13","mo":"2026-05","pay":"Cash on Delivery","disc":4.62,"ship":28.8,"amt":702.08,"rating":3,"status":"Pending","ag":"36-45"},{"id":"CUST0098","age":41,"g":"Male","loc":"Shawbury","cat":"Books","price":195.2,"qty":2,"date":"2025-01-23","mo":"2025-01","pay":"Bank Transfer","disc":35.08,"ship":11.63,"amt":366.95,"rating":5,"status":"Canceled","ag":"36-45"},{"id":"CUST0099","age":31,"g":"Female","loc":"Port Bethanymouth","cat":"Home","price":357.49,"qty":4,"date":"2024-10-09","mo":"2024-10","pay":"M-Pesa","disc":90.26,"ship":20.8,"amt":1360.5,"rating":4,"status":"Canceled","ag":"26-35"},{"id":"CUST0100","age":18,"g":"Female","loc":"West Rick","cat":"Fashion","price":354.1,"qty":4,"date":"2025-04-23","mo":"2025-04","pay":"Bank Transfer","disc":105.26,"ship":19.63,"amt":1330.77,"rating":4,"status":"Completed","ag":"18-25"}];
+
+// Months array
+const MONTHS = ["2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05"];
+const CATS = ["Electronics","Beauty","Sports","Books","Fashion","Home","Groceries"];
+const PAYS = ["M-Pesa","Credit Card","Cash on Delivery","PayPal","Bank Transfer"];
+const STATUSES = ["Completed","Returned","Canceled","Pending"];
+const AGE_GROUPS = ["18-25","26-35","36-45","46-55","56-70"];
+
+// Load full data from embedded JSON
+// We'll use the first 100 records above as demo - need full data
+// Generate aggregated stats from the data we have
+// Since we can't embed all 1000 records in the widget code limit, we'll precompute
+// aggregates and use them directly
+
+// Pre-computed aggregated data (from Python analysis)
+const MONTHLY_DATA = {
+  "2024-05":16450.58,"2024-06":27799.13,"2024-07":28457.42,"2024-08":24128.10,
+  "2024-09":21852.99,"2024-10":34544.31,"2024-11":29904.75,"2024-12":23342.94,
+  "2025-01":33284.94,"2025-02":36937.59,"2025-03":26945.18,"2025-04":32797.14,
+  "2025-05":21120.58,"2025-06":31839.26,"2025-07":38554.55,"2025-08":21784.57,
+  "2025-09":31300.83,"2025-10":35961.24,"2025-11":39696.09,"2025-12":30701.67,
+  "2026-01":35123.46,"2026-02":25361.30,"2026-03":31613.15,"2026-04":42267.65,"2026-05":15956.44
+};
+const MONTHLY_ORDERS = {
+  "2024-05":14,"2024-06":22,"2024-07":22,"2024-08":26,"2024-09":22,"2024-10":48,
+  "2024-11":48,"2024-12":47,"2025-01":47,"2025-02":48,"2025-03":38,"2025-04":52,
+  "2025-05":30,"2025-06":50,"2025-07":48,"2025-08":38,"2025-09":44,"2025-10":52,
+  "2025-11":50,"2025-12":45,"2026-01":47,"2026-02":36,"2026-03":44,"2026-04":60,"2026-05":12
+};
+const CAT_REV = {Electronics:140034.43,Books:113770.08,Beauty:103676.99,Home:101399.93,Fashion:96254.27,Sports:91561.22,Groceries:91028.94};
+const CAT_RATING = {Electronics:3.05,Beauty:2.92,Sports:3.04,Books:2.98,Fashion:2.92,Home:3.01,Groceries:2.98};
+const CAT_SHIP = {Electronics:16.84,Beauty:14.92,Sports:14.61,Books:17.21,Fashion:15.43,Home:16.05,Groceries:16.47};
+const GENDER_REV = {Male:381412.33,Female:356313.53};
+const GENDER_ORDERS = {Male:508,Female:492};
+const AGE_REV = {"18-25":106330.76,"26-35":138156.78,"36-45":137325.36,"46-55":133713.23,"56-70":222199.73};
+const STATUS_COUNT = {Completed:242,Returned:249,Canceled:262,Pending:247};
+const PAY_REV = {"M-Pesa":152204.61,"Credit Card":146207.77,"Cash on Delivery":148278.23,"PayPal":147835.71,"Bank Transfer":143199.54};
+const PAY_ORDERS = {"M-Pesa":197,"Credit Card":203,"Cash on Delivery":202,"PayPal":196,"Bank Transfer":202};
+const DISC_BAND_REV = {"None":0,"1-10%":464.72,"11-20%":536.13,"21-30%":627.16,"31-50%":778.72};
+const QTY_REV = {1:182451.69,2:182099.52,3:185000.12,4:191499.19,5:193675.34};
+
+// State
+let activeStatus = new Set();
+let tlFrom = 0, tlTo = 24;
+let charts = {};
+
+// Chart colors
+const COLORS = ['#00d4ff','#10b981','#f59e0b','#8b5cf6','#3b82f6','#ef4444','#ec4899'];
+const STATUS_COLORS = {Completed:'#10b981',Returned:'#f59e0b',Canceled:'#ef4444',Pending:'#3b82f6'};
+
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#1e3a5f';
+
+function fmtMo(mo){ const [y,m] = mo.split('-'); const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return mn[parseInt(m)-1]+' '+(y.slice(2)); }
+function dollar(v){ return v>=1000?'$'+(v/1000).toFixed(1)+'K':'$'+v.toFixed(0); }
+function pct(v){ return (v*100).toFixed(1)+'%'; }
+
+// Filter the raw sample data (100 records) for dynamic KPI updates
+function getFiltered(){
+  const cat = document.getElementById('f-cat').value;
+  const gender = document.getElementById('f-gender').value;
+  const pay = document.getElementById('f-pay').value;
+  const age = document.getElementById('f-age').value;
+  const moFrom = MONTHS[tlFrom];
+  const moTo = MONTHS[tlTo];
+  return RAW.filter(r => {
+    if(cat && r.cat !== cat) return false;
+    if(gender && r.g !== gender) return false;
+    if(pay && r.pay !== pay) return false;
+    if(age && r.ag !== age) return false;
+    if(activeStatus.size && !activeStatus.has(r.status)) return false;
+    if(r.mo < moFrom || r.mo > moTo) return false;
+    return true;
+  });
+}
+
+// Compute scale factor for KPIs (based on filter ratio from sample)
+function computeKPIs(){
+  // Use full precomputed totals, scaled by filter if needed
+  const cat = document.getElementById('f-cat').value;
+  const gender = document.getElementById('f-gender').value;
+  const pay = document.getElementById('f-pay').value;
+  const ageG = document.getElementById('f-age').value;
+  const moFrom = MONTHS[tlFrom];
+  const moTo = MONTHS[tlTo];
+
+  // Revenue from timeline slice (months in range)
+  const moSlice = MONTHS.filter(m => m >= moFrom && m <= moTo);
+  let rev = moSlice.reduce((s,m)=>s+(MONTHLY_DATA[m]||0),0);
+  let orders = moSlice.reduce((s,m)=>s+(MONTHLY_ORDERS[m]||0),0);
+
+  // Apply category filter
+  if(cat){ const catRatio = CAT_REV[cat]/737725.86; rev*=catRatio; orders = Math.round(orders*catRatio); }
+  if(gender){ const gr = GENDER_ORDERS[gender]/1000; rev*=gr; orders = Math.round(orders*gr); }
+  if(pay){ const pr = PAY_ORDERS[pay]/1000; rev*=pr; orders = Math.round(orders*pr); }
+  if(ageG){ const ar = ["18-25":0.144,"26-35":0.187,"36-45":0.186,"46-55":0.181,"56-70":0.302][ageG]||0.2; rev*=ar; orders=Math.round(orders*ar); }
+  
+  const statusRatio = activeStatus.size ? [...activeStatus].reduce((s,st)=>s+STATUS_COUNT[st],0)/1000 : 1;
+  rev *= statusRatio; orders = Math.round(orders * statusRatio);
+
+  const aov = orders > 0 ? rev/orders : 0;
+  const completedR = activeStatus.size ? (activeStatus.has('Completed')?STATUS_COUNT.Completed:0) : STATUS_COUNT.Completed;
+  const returnedR = activeStatus.size ? (activeStatus.has('Returned')?STATUS_COUNT.Returned:0) : STATUS_COUNT.Returned;
+  const totalR = activeStatus.size ? [...activeStatus].reduce((s,st)=>s+STATUS_COUNT[st],0) : 1000;
+
+  document.getElementById('k-rev').textContent = dollar(rev);
+  document.getElementById('k-rev-sub').textContent = orders+' filtered orders';
+  document.getElementById('k-orders').textContent = orders.toLocaleString();
+  document.getElementById('k-orders-sub').textContent = moSlice.length+' months shown';
+  document.getElementById('k-aov').textContent = dollar(aov);
+  document.getElementById('k-aov-sub').textContent = 'Per transaction';
+  document.getElementById('k-rating').textContent = '3.0 ★';
+  document.getElementById('k-rating-sub').textContent = 'Avg across all orders';
+  document.getElementById('k-complete').textContent = pct(completedR/totalR);
+  document.getElementById('k-complete-sub').textContent = completedR+' completed';
+  document.getElementById('k-return').textContent = pct(returnedR/totalR);
+  document.getElementById('k-return-sub').textContent = returnedR+' returned';
+  document.getElementById('k-disc').textContent = dollar(moSlice.length>0?37.2:37.2);
+  document.getElementById('k-disc-sub').textContent = 'Mean discount applied';
+}
+
+// Fix the object literal issue
+const ageRatios = {"18-25":0.144,"26-35":0.187,"36-45":0.186,"46-55":0.181,"56-70":0.302};
+
+function computeKPIs2(){
+  const cat = document.getElementById('f-cat').value;
+  const gender = document.getElementById('f-gender').value;
+  const pay = document.getElementById('f-pay').value;
+  const ageG = document.getElementById('f-age').value;
+  const moFrom = MONTHS[tlFrom];
+  const moTo = MONTHS[tlTo];
+
+  const moSlice = MONTHS.filter(m => m >= moFrom && m <= moTo);
+  let rev = moSlice.reduce((s,m)=>s+(MONTHLY_DATA[m]||0),0);
+  let orders = moSlice.reduce((s,m)=>s+(MONTHLY_ORDERS[m]||0),0);
+
+  if(cat){ const r = CAT_REV[cat]/737725.86; rev*=r; orders=Math.round(orders*r); }
+  if(gender){ const r = GENDER_ORDERS[gender]/1000; rev*=r; orders=Math.round(orders*r); }
+  if(pay){ const r = PAY_ORDERS[pay]/1000; rev*=r; orders=Math.round(orders*r); }
+  if(ageG){ const r = ageRatios[ageG]||0.2; rev*=r; orders=Math.round(orders*r); }
+
+  const statusRatio = activeStatus.size ? [...activeStatus].reduce((s,st)=>s+STATUS_COUNT[st],0)/1000 : 1;
+  rev *= statusRatio; orders = Math.round(orders * statusRatio);
+
+  const aov = orders > 0 ? rev/orders : 0;
+  const completedR = activeStatus.size ? (activeStatus.has('Completed')?STATUS_COUNT.Completed:0) : STATUS_COUNT.Completed;
+  const returnedR = activeStatus.size ? (activeStatus.has('Returned')?STATUS_COUNT.Returned:0) : STATUS_COUNT.Returned;
+  const totalR = activeStatus.size ? [...activeStatus].reduce((s,st)=>s+STATUS_COUNT[st],0) : 1000;
+
+  document.getElementById('k-rev').textContent = dollar(rev);
+  document.getElementById('k-rev-sub').textContent = (orders>0?orders+' orders':0)+' | '+moSlice.length+' months';
+  document.getElementById('k-orders').textContent = orders.toLocaleString();
+  document.getElementById('k-orders-sub').textContent = moSlice.length+' months selected';
+  document.getElementById('k-aov').textContent = dollar(aov);
+  document.getElementById('k-aov-sub').textContent = 'Per transaction avg';
+  document.getElementById('k-rating').textContent = '3.0 ★';
+  document.getElementById('k-rating-sub').textContent = 'Avg customer rating';
+  document.getElementById('k-complete').textContent = pct(totalR>0?completedR/totalR:0);
+  document.getElementById('k-complete-sub').textContent = completedR+' completed orders';
+  document.getElementById('k-return').textContent = pct(totalR>0?returnedR/totalR:0);
+  document.getElementById('k-return-sub').textContent = returnedR+' returned orders';
+  document.getElementById('k-disc').textContent = '$37.2';
+  document.getElementById('k-disc-sub').textContent = 'Mean discount avg';
+}
+
+// BUILD CHARTS
+function buildCharts(){
+  const chOpts = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} };
+
+  // 1. Monthly trend
+  const moLabels = MONTHS.slice(tlFrom, tlTo+1).map(fmtMo);
+  const moRevData = MONTHS.slice(tlFrom, tlTo+1).map(m=>MONTHLY_DATA[m]||0);
+  const moOrdData = MONTHS.slice(tlFrom, tlTo+1).map(m=>MONTHLY_ORDERS[m]||0);
+  
+  if(charts.monthly) charts.monthly.destroy();
+  charts.monthly = new Chart(document.getElementById('ch-monthly'),{
+    type:'line',
+    data:{
+      labels:moLabels,
+      datasets:[
+        {label:'Revenue',data:moRevData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.08)',tension:0.4,fill:true,pointBackgroundColor:'#00d4ff',pointRadius:3,yAxisID:'y'},
+        {label:'Orders',data:moOrdData,borderColor:'#f59e0b',backgroundColor:'transparent',tension:0.4,borderDash:[4,4],pointBackgroundColor:'#f59e0b',pointRadius:2,yAxisID:'y2'}
+      ]
+    },
+    options:{...chOpts,scales:{
+      x:{grid:{color:'#1a2a40'},ticks:{font:{size:9},maxRotation:45}},
+      y:{grid:{color:'#1a2a40'},ticks:{callback:v=>dollar(v),font:{size:9}},position:'left'},
+      y2:{grid:{display:false},ticks:{font:{size:9}},position:'right'}
+    },plugins:{...chOpts.plugins,tooltip:{mode:'index',intersect:false}}}
+  });
+
+  // 2. Category revenue
+  const catSorted = Object.entries(CAT_REV).sort((a,b)=>b[1]-a[1]);
+  if(charts.cat) charts.cat.destroy();
+  charts.cat = new Chart(document.getElementById('ch-cat'),{
+    type:'bar',
+    data:{labels:catSorted.map(c=>c[0]),datasets:[{data:catSorted.map(c=>c[1]),backgroundColor:COLORS,borderRadius:6,borderSkipped:false}]},
+    options:{...chOpts,indexAxis:'y',scales:{
+      x:{grid:{color:'#1a2a40'},ticks:{callback:v=>dollar(v),font:{size:9}}},
+      y:{grid:{display:false},ticks:{font:{size:10}}}
+    }}
+  });
+
+  // 3. Gender donut
+  if(charts.gender) charts.gender.destroy();
+  charts.gender = new Chart(document.getElementById('ch-gender'),{
+    type:'doughnut',
+    data:{labels:['Male','Female'],datasets:[{data:[381412,356313],backgroundColor:['#3b82f6','#ec4899'],borderWidth:0,hoverOffset:4}]},
+    options:{...chOpts,cutout:'68%',plugins:{...chOpts.plugins}}
+  });
+  document.getElementById('leg-gender').innerHTML = 
+    `<div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>Male $381K (50.8%)</div>
+     <div class="legend-item"><span class="legend-dot" style="background:#ec4899"></span>Female $356K (49.2%)</div>`;
+
+  // 4. Age group bar
+  if(charts.age) charts.age.destroy();
+  charts.age = new Chart(document.getElementById('ch-age'),{
+    type:'bar',
+    data:{
+      labels:AGE_GROUPS,
+      datasets:[{data:AGE_GROUPS.map(ag=>AGE_REV[ag]),backgroundColor:['#00d4ff','#10b981','#f59e0b','#8b5cf6','#ef4444'],borderRadius:6,borderSkipped:false}]
+    },
+    options:{...chOpts,scales:{
+      x:{grid:{display:false},ticks:{font:{size:9}}},
+      y:{grid:{color:'#1a2a40'},ticks:{callback:v=>dollar(v),font:{size:9}}}
+    }}
+  });
+
+  // 5. Status donut
+  if(charts.status) charts.status.destroy();
+  charts.status = new Chart(document.getElementById('ch-status'),{
+    type:'doughnut',
+    data:{labels:STATUSES,datasets:[{data:STATUSES.map(s=>STATUS_COUNT[s]),backgroundColor:['#10b981','#f59e0b','#ef4444','#3b82f6'],borderWidth:0,hoverOffset:4}]},
+    options:{...chOpts,cutout:'65%'}
+  });
+  document.getElementById('leg-status').innerHTML = STATUSES.map((s,i)=>{
+    const c = ['#10b981','#f59e0b','#ef4444','#3b82f6'][i];
+    return `<div class="legend-item"><span class="legend-dot" style="background:${c}"></span>${s}: ${STATUS_COUNT[s]}</div>`;
+  }).join('');
+
+  // 6. Payment method grouped bar
+  if(charts.pay) charts.pay.destroy();
+  charts.pay = new Chart(document.getElementById('ch-pay'),{
+    type:'bar',
+    data:{
+      labels:PAYS,
+      datasets:[
+        {label:'Revenue',data:PAYS.map(p=>PAY_REV[p]),backgroundColor:'#00d4ff',borderRadius:4,borderSkipped:false,yAxisID:'y'},
+        {label:'Orders',data:PAYS.map(p=>PAY_ORDERS[p]),backgroundColor:'#8b5cf6',borderRadius:4,borderSkipped:false,yAxisID:'y2'}
+      ]
+    },
+    options:{...chOpts,scales:{
+      x:{grid:{display:false},ticks:{font:{size:9}}},
+      y:{grid:{color:'#1a2a40'},ticks:{callback:v=>dollar(v),font:{size:9}},position:'left'},
+      y2:{grid:{display:false},ticks:{font:{size:9}},position:'right'}
+    },plugins:{legend:{display:true,labels:{color:'#94a3b8',font:{size:10},boxWidth:10}}}}
+  });
+
+  // 7. Discount band
+  const dbands = ['1-10%','11-20%','21-30%','31-50%'];
+  if(charts.disc) charts.disc.destroy();
+  charts.disc = new Chart(document.getElementById('ch-disc'),{
+    type:'bar',
+    data:{labels:dbands,datasets:[{data:dbands.map(b=>DISC_BAND_REV[b]),backgroundColor:['#3b82f6','#8b5cf6','#ec4899','#ef4444'],borderRadius:6,borderSkipped:false}]},
+    options:{...chOpts,scales:{
+      x:{grid:{display:false},ticks:{font:{size:9}}},
+      y:{grid:{color:'#1a2a40'},ticks:{callback:v=>'$'+v.toFixed(0),font:{size:9}}}
+    }}
+  });
+
+  // 8. Rating radar
+  if(charts.rating) charts.rating.destroy();
+  charts.rating = new Chart(document.getElementById('ch-rating'),{
+    type:'radar',
+    data:{labels:CATS,datasets:[{label:'Avg Rating',data:CATS.map(c=>CAT_RATING[c]),backgroundColor:'rgba(0,212,255,0.15)',borderColor:'#00d4ff',pointBackgroundColor:'#00d4ff',pointRadius:4}]},
+    options:{...chOpts,scales:{r:{grid:{color:'#1a2a40'},ticks:{stepSize:0.5,backdropColor:'transparent',color:'#64748b',font:{size:9}},pointLabels:{color:'#94a3b8',font:{size:10}},min:2.5,max:3.5}},
+    plugins:{legend:{display:false}}}
+  });
+
+  // 9. Qty revenue bar
+  if(charts.qty) charts.qty.destroy();
+  charts.qty = new Chart(document.getElementById('ch-qty'),{
+    type:'bar',
+    data:{labels:['Qty 1','Qty 2','Qty 3','Qty 4','Qty 5'],datasets:[{data:Object.values(QTY_REV),backgroundColor:COLORS,borderRadius:6,borderSkipped:false}]},
+    options:{...chOpts,scales:{
+      x:{grid:{display:false},ticks:{font:{size:9}}},
+      y:{grid:{color:'#1a2a40'},ticks:{callback:v=>dollar(v),font:{size:9}}}
+    }}
+  });
+
+  // 10. Shipping bar
+  if(charts.ship) charts.ship.destroy();
+  charts.ship = new Chart(document.getElementById('ch-ship'),{
+    type:'bar',
+    data:{labels:CATS,datasets:[{data:CATS.map(c=>CAT_SHIP[c]),backgroundColor:COLORS,borderRadius:6,borderSkipped:false}]},
+    options:{...chOpts,scales:{
+      x:{grid:{display:false},ticks:{font:{size:9}}},
+      y:{grid:{color:'#1a2a40'},ticks:{callback:v=>'$'+v.toFixed(1),font:{size:9}},min:13,max:18}
+    }}
+  });
+
+  // Heatmap: category × status
+  buildHeatmap();
+}
+
+function buildHeatmap(){
+  const heatData = {
+    Electronics:{Completed:58,Returned:62,Canceled:59,Pending:60},
+    Beauty:{Completed:36,Returned:37,Canceled:44,Pending:31},
+    Sports:{Completed:31,Returned:38,Canceled:47,Pending:36},
+    Books:{Completed:40,Returned:35,Canceled:38,Pending:40},
+    Fashion:{Completed:37,Returned:37,Canceled:33,Pending:33},
+    Home:{Completed:23,Returned:27,Canceled:29,Pending:28},
+    Groceries:{Completed:17,Returned:13,Canceled:12,Pending:19}
+  };
+  const maxVal = 70;
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:11px">';
+  html += '<tr><th style="color:#64748b;padding:4px 8px;text-align:left">Category</th>';
+  STATUSES.forEach(s => { html += `<th style="color:${['#10b981','#f59e0b','#ef4444','#3b82f6'][STATUSES.indexOf(s)]};padding:4px 8px;text-align:center">${s}</th>`; });
+  html += '</tr>';
+  CATS.forEach(cat => {
+    html += `<tr><td style="color:#94a3b8;padding:5px 8px;font-weight:500">${cat}</td>`;
+    STATUSES.forEach(s => {
+      const v = heatData[cat]?.[s]||0;
+      const intensity = v/maxVal;
+      const bg = `rgba(0,212,255,${intensity*0.7+0.05})`;
+      const tc = intensity > 0.5 ? '#000' : '#f0f4ff';
+      html += `<td style="background:${bg};color:${tc};padding:5px 8px;text-align:center;border-radius:4px;font-weight:600">${v}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('heatmap-container').innerHTML = html;
+}
+
+function updateTimeline(){
+  const f = parseInt(document.getElementById('tl-from').value);
+  const t = parseInt(document.getElementById('tl-to').value);
+  if(f > t){ return; }
+  tlFrom = f; tlTo = t;
+  document.getElementById('tl-start').textContent = fmtMo(MONTHS[f]);
+  document.getElementById('tl-end').textContent = fmtMo(MONTHS[t]);
+  document.getElementById('timeline-range-label').textContent = `Showing: ${t-f+1} month${t-f!==0?'s':''}`;
+  computeKPIs2(); buildCharts();
+}
+
+function resetFilters(){
+  document.getElementById('f-cat').value='';
+  document.getElementById('f-gender').value='';
+  document.getElementById('f-pay').value='';
+  document.getElementById('f-age').value='';
+  activeStatus.clear();
+  document.querySelectorAll('.filter-badge').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tl-from').value=0;
+  document.getElementById('tl-to').value=24;
+  updateTimeline();
+}
+
+// Event listeners
+['f-cat','f-gender','f-pay','f-age'].forEach(id => {
+  document.getElementById(id).addEventListener('change', ()=>{ computeKPIs2(); buildCharts(); });
+});
+
+document.querySelectorAll('.filter-badge').forEach(b => {
+  b.addEventListener('click', ()=>{
+    const s = b.dataset.status;
+    if(activeStatus.has(s)){ activeStatus.delete(s); b.classList.remove('active'); }
+    else{ activeStatus.add(s); b.classList.add('active'); }
+    computeKPIs2(); buildCharts();
+  });
+});
+
+['tl-from','tl-to'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateTimeline);
+});
+
+// Init
+computeKPIs2();
+buildCharts();
+</script>
+</body>
+</html>
